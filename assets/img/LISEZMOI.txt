@@ -1,0 +1,3 @@
+Déposez ici les photos du site (récupérées depuis manoirdeproce.fr) avec ces noms :
+hero.jpg, manoir.jpg, cafe.jpg, restaurant.jpg, reception.jpg, galerie-1.jpg … galerie-4.jpg
+Sans image, un dégradé vert/sable s'affiche à la place.

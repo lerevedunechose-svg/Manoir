@@ -1,0 +1,25 @@
+/* Widget chatbot — point de départ, à personnaliser */
+.cb-launcher {
+  position: fixed; right: 20px; bottom: 20px; z-index: 1000;
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--vert, #2f4a3a); color: #fff; font-size: 26px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.cb-panel {
+  position: fixed; right: 20px; bottom: 92px; z-index: 1000;
+  width: min(360px, calc(100vw - 32px)); height: min(520px, calc(100vh - 120px));
+  display: none; flex-direction: column; overflow: hidden;
+  background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.25);
+  font-family: "Lato", system-ui, sans-serif;
+}
+.cb-panel.open { display: flex; }
+.cb-header { background: var(--vert, #2f4a3a); color: #fff; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+.cb-header strong { font-family: "Playfair Display", Georgia, serif; font-weight: 500; font-size: 1.05rem; }
+.cb-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+.cb-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--creme, #f6f1e7); }
+.cb-msg { max-width: 85%; padding: 10px 13px; border-radius: 12px; font-size: .92rem; line-height: 1.45; white-space: pre-line; }
+.cb-msg.bot { align-self: flex-start; background: #fff; border: 1px solid var(--sable, #e6dcc8); }
+.cb-msg.user { align-self: flex-end; background: var(--vert, #2f4a3a); color: #fff; }
+.cb-form { display: flex; border-top: 1px solid var(--sable, #e6dcc8); }
+.cb-form input { flex: 1; border: none; padding: 14px; font: inherit; outline: none; }
+.cb-form button { border: none; background: var(--or, #b08d57); color: #fff; padding: 0 18px; cursor: pointer; font: inherit; }

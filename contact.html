@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact — Manoir de Procé (maquette)</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="chatbot/chatbot.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="index.html"><strong>Manoir de Procé</strong><span>Café · Restaurant · Réceptions</span></a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav class="nav" id="nav">
+      <ul>
+        <li><a href="index.html">Accueil</a></li>
+        <li><a href="cafe-restaurant.html">Café Restaurant</a></li>
+        <li><a href="privatisation.html">Privatisation</a></li>
+        <li><a href="contact.html" class="active">Contact</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero small">
+    <div class="container">
+      <p class="surtitre">Nous écrire · Nous trouver</p>
+      <h1>Contact</h1>
+    </div>
+  </section>
+
+  <section>
+    <div class="container split">
+      <div>
+        <h2>Écrivez-nous</h2>
+        <form class="contact" onsubmit="event.preventDefault(); alert('Maquette locale : formulaire non envoyé.');">
+          <div class="row">
+            <input type="text" name="nom" placeholder="Nom" required>
+            <input type="email" name="email" placeholder="E-mail" required>
+          </div>
+          <div class="row">
+            <input type="tel" name="tel" placeholder="Téléphone">
+            <select name="objet">
+              <option>Réservation restaurant</option>
+              <option>Privatisation / événement</option>
+              <option>Autre demande</option>
+            </select>
+          </div>
+          <textarea name="message" placeholder="Votre message"></textarea>
+          <button class="btn" type="submit">Envoyer</button>
+        </form>
+      </div>
+      <div>
+        <h2>Nous trouver</h2>
+        <p><strong>Manoir de Procé</strong><br>44 rue des Dervallières<br>44000 Nantes</p>
+        <p>Téléphone : <a href="tel:+33251864723">02 51 86 47 23</a></p>
+        <p>Café : de 10h à la fermeture du parc<br>Restaurant : du mardi au dimanche, 12h15 – 14h00</p>
+        <div class="map">Emplacement carte<br>(parc de Procé)</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="cols">
+      <div>
+        <h4>Manoir de Procé</h4>
+        <p>44 rue des Dervallières<br>44000 Nantes</p>
+        <p>Parc de Procé</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p><a href="tel:+33251864723">02 51 86 47 23</a></p>
+        <p><a href="contact.html">Formulaire de contact</a></p>
+      </div>
+      <div>
+        <h4>Suivez-nous</h4>
+        <div class="socials">
+          <a href="#">Facebook</a>
+          <a href="#">Instagram</a>
+        </div>
+      </div>
+    </div>
+    <p class="copy">© Manoir de Procé — Maquette locale de développement (non officielle)</p>
+  </div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+<script src="chatbot/chatbot.js"></script>
+</body>
+</html>
