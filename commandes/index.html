@@ -177,13 +177,14 @@ main { max-width: 1240px; margin: 0 auto; padding-top: 22px; display: grid; gap:
 }
 .ticket:nth-child(3n+1) { transform: rotate(-.4deg); }
 .ticket:nth-child(3n+2) { transform: rotate(.35deg); }
-@media (prefers-reduced-motion: reduce) { .ticket { transform: none !important; } }
+@media (prefers-reduced-motion: reduce), (max-width: 640px) { .ticket { transform: none !important; } }
 .ticket-tete { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
 .ticket h3 { font-size: 1.15rem; color: var(--encre); overflow-wrap: anywhere; }
 .ticket .sous { color: var(--encre-2); font-size: .85rem; }
 .ticket .ligne-fichier { font-family: var(--f-ticket); font-size: .74rem; color: var(--encre-2); overflow-wrap: anywhere; }
 .ticket hr { border: 0; border-top: 1px dashed var(--trait); margin: 12px 0; }
 .ticket .jours { display: grid; gap: 10px; }
+.jours, .jour, .prestation, .jour > *, .puces > * { min-width: 0; }
 .jour { display: grid; gap: 6px; }
 .jour.hors { opacity: .5; }
 .jour-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--f-ticket); font-weight: 700; }
@@ -234,7 +235,7 @@ main { max-width: 1240px; margin: 0 auto; padding-top: 22px; display: grid; gap:
 .recette.non-modelise .nom::after { content: " *"; color: var(--attention); }
 .fixes { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .84rem; color: var(--encre-2); }
 .fixes span b { font-family: var(--f-ticket); color: var(--encre); }
-select.ajout { border: 1px dashed var(--trait); border-radius: 999px; background: transparent; padding: 4px 10px; font-size: .82rem; max-width: 100%; }
+select.ajout { border: 1px dashed var(--trait); border-radius: 999px; background: transparent; padding: 4px 10px; font-size: .82rem; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
 
 /* ---------- Tableaux ---------- */
 .tableau-wrap { overflow-x: auto; }

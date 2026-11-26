@@ -24,7 +24,7 @@
       const v = attrs[k];
       if (v == null || v === false) return;
       if (k === 'class') e.className = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+      else if (k === 'style' && typeof v === 'object') Object.keys(v).forEach(p => { if (p.indexOf('--') === 0) e.style.setProperty(p, v[p]); else e.style[p] = v[p]; });
       else if (k.slice(0, 2) === 'on' && typeof v === 'function') e.addEventListener(k.slice(2), v);
       else if (k === 'html') { /* jamais utilisé avec des données */ }
       else if (v === true) e.setAttribute(k, '');
@@ -54,8 +54,9 @@
   function nettoyer(s) {
     return String(s == null ? '' : s)
       .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[e-mail]')
-      .replace(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g, '[tél.]')
-      .replace(/\bFR\d{2}(?:\s?[\dA-Z]{4}){5,7}\b/g, '[IBAN]');
+      .replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b/gi, m => (/\d{6}/.test(m.replace(/\s/g, '')) ? '[IBAN]' : m)) // IBAN d'abord
+      .replace(/\b(?:BIC|SWIFT)\s*:?\s*[A-Z]{6}[A-Z0-9]{2,5}\b/gi, '[BIC]')
+      .replace(/(?:(?:\+|00)33\s?(?:\(0\)\s?)?|\b0)[1-9](?:[\s.\/-]?\d{2}){4}/g, '[tél.]');
   }
   async function copier(texte, zone) {
     try { await navigator.clipboard.writeText(texte); toast('Copié dans le presse-papiers.', 'Oui chef !'); return true; } catch (e) {
@@ -145,106 +146,260 @@
     app: { alias: {}, habitudes: {}, coefficients: {}, fournisseurs: {}, carnet: { notes: [] }, reglages: {}, referentiel: null, forfaits: [] },
     semaineDate: null, semaine: null, sem: null, calc: null,
     brigade: {}, moi: { id: 'local', nom: 'Moi' },
-    caps: {}, textes: {}, lectures: {}, decalages: {}, vue: 'fiches', retourCle: null, retourDoc: null,
+    caps: {}, textes: {}, lectures: {}, decalages: {}, vue: 'fiches', retourCle: null,
+    chargement: false, lectureSeule: false, brouillonRetour: {}, genRendu: 0, renduEnAttente: false,
   };
   const semaineVide = cle => ({ cle, fiches: [], choix: {}, stock: {}, options: {}, pdf: null, retour: null });
+  /** Les documents livrés par la mémoire partagée sont gelés : on travaille toujours sur une copie. */
+  const copie = x => (x == null ? x : JSON.parse(JSON.stringify(x)));
+  /** Cartes partagées (une entrée = une clé) : on écrit clé par clé, une suppression laisse une pierre tombale. */
+  const CARTES = ['alias', 'coefficients', 'fournisseurs'];
+  const sansTombes = o => { const r = {}; Object.keys(o || {}).forEach(k => { if (o[k] && !o[k]._supprime) r[k] = o[k]; }); return r; };
 
   /* ------------------------------------------------------------------ *
    * Mémoire : db partagée (Claude) ou navigateur
+   *
+   * Dans la mémoire partagée, une semaine = un document « semaines/<clé> » (choix du chef, stock, options,
+   * PDF, retour) + une fiche par document « semaines/<clé>/fiches/<id> ». On n'écrit que ce qui a changé
+   * (update clé par clé, set par fiche) : deux personnes qui travaillent en même temps ne s'écrasent pas.
    * ------------------------------------------------------------------ */
   const Memoire = {
-    db: null, desabSemaine: null, enCours: Promise.resolve(), version: 0, enregistree: 0, minuteur: null,
-    get enAttente() { return this.version !== this.enregistree; },
+    db: null, desab: [], chaines: {}, sale: null, minuteur: null, enVol: {}, existe: {}, recu: {},
     cleDoc: s => String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_').slice(0, 180) || 'x',
+
+    /** Écritures d'un même document l'une après l'autre (règle de la mémoire partagée). */
+    enchainer(chemin, op) {
+      const p = (this.chaines[chemin] || Promise.resolve()).then(op).catch(e => this.erreur(e));
+      this.chaines[chemin] = p;
+      return p;
+    },
+    /** Écrit le dernier état connu ; les demandes rapprochées n'en font qu'une. */
+    ecrireDernier(chemin, lire) {
+      if (!this.db) return Promise.resolve();
+      const etat = this.chaines['?' + chemin] || (this.chaines['?' + chemin] = { prevu: false });
+      if (etat.prevu) return this.chaines[chemin];
+      etat.prevu = true;
+      return this.enchainer(chemin, () => { etat.prevu = false; return this.db.doc(chemin).set(copie(lire())); });
+    },
+    erreur(e) {
+      console.warn(e);
+      const code = e && e.code;
+      if (code === 'invalid_argument' && S.caps.db) {
+        if (!S.lectureSeule) { S.lectureSeule = true; toast('Vous êtes en lecture seule sur cette appli : demandez un accès Contributeur pour saisir.'); rendre(); }
+      } else if (code === 'quota_exceeded') toast('Mémoire partagée pleine : supprimez d’anciennes semaines.');
+      else toast('Enregistrement partagé impossible (' + (code || 'erreur') + ').');
+    },
+
     async init(db) {
       this.db = db;
-      if (db) {
-        const minuteur = setTimeout(() => toast('La mémoire de l’équipe ne répond pas encore ; vos saisies restent sur cet appareil en attendant.'), 10000);
-        db.collection('apprentissage').onSnapshot(snap => {
-          clearTimeout(minuteur);
-          snap.docs.forEach(d => { if (d.exists) S.app[d.id] = d.data(); });
-          reindexer(); rendreDouce();
-        }, e => { clearTimeout(minuteur); console.warn('apprentissage', e); });
-        db.collection('brigade').onSnapshot(snap => {
-          snap.docs.forEach(d => { if (d.exists) S.brigade[d.id] = d.data(); });
-          majMoi(); if (S.vue === 'brigade') rendreDouce();
-        }, e => console.warn('brigade', e));
-      } else {
+      if (!db) {
         ['alias', 'habitudes', 'coefficients', 'fournisseurs', 'carnet', 'reglages', 'referentiel'].forEach(k => { const v = lsGet('app:' + k, null); if (v) S.app[k] = v; });
         S.brigade = lsGet('brigade', {});
+        return;
       }
+      // la mémoire de l'équipe remplace tout ce qui venait de ce navigateur
+      S.app = { alias: {}, habitudes: {}, coefficients: {}, fournisseurs: {}, carnet: { notes: [] }, reglages: {}, referentiel: null, forfaits: [] };
+      S.brigade = {}; reindexer();
+      const minuteur = setTimeout(() => toast('La mémoire de l’équipe ne répond pas encore : réessayez dans un instant.'), 10000);
+      db.collection('apprentissage').onSnapshot(snap => {
+        clearTimeout(minuteur);
+        snap.docs.forEach(d => { if (d.exists) { const v = copie(d.data()); S.app[d.id] = CARTES.indexOf(d.id) >= 0 ? sansTombes(v) : v; } });
+        reindexer(); rendreDouce();
+      }, e => { clearTimeout(minuteur); console.warn('apprentissage', e); });
+      db.collection('brigade').onSnapshot(snap => {
+        snap.docs.forEach(d => { if (d.exists && !this.enVol['brigade/' + d.id]) S.brigade[d.id] = copie(d.data()); });
+        majMoi(); if (S.vue === 'brigade') rendreDouce();
+      }, e => console.warn('brigade', e));
     },
+
+    /* ---------- semaine ---------- */
     ouvrirSemaine(cle) {
-      if (this.desabSemaine) { this.desabSemaine(); this.desabSemaine = null; }
-      if (!this.db) { S.semaine = lsGet('semaine:' + cle, null) || semaineVide(cle); return; }
+      this.desab.forEach(f => f()); this.desab = [];
+      if (!this.db) { S.semaine = copie(lsGet('semaine:' + cle, null)) || semaineVide(cle); return; }
       S.semaine = semaineVide(cle);
-      S.chargement = true;
-      const attente = setTimeout(() => { if (S.chargement) { S.chargement = false; rendreDouce(); toast('La semaine partagée ne répond pas encore : réessayez dans un instant.'); } }, 10000);
-      this.desabSemaine = this.db.doc('semaines/' + cle).onSnapshot(d => {
-        if (!d.metadata || !d.metadata.fromCache) { clearTimeout(attente); }
-        S.chargement = false;
-        // nos propres modifications sont en route : on garde l'état local jusqu'à leur enregistrement
-        if (this.enAttente || (d.metadata && d.metadata.hasPendingWrites)) return;
+      S.chargement = true; this.recu = { doc: false, fiches: false };
+      const attente = setTimeout(() => {
+        if (S.chargement) toast('La semaine partagée ne répond pas encore : les saisies restent bloquées jusqu’à son chargement.');
+      }, 10000);
+      const pret = () => { if (this.recu.doc && this.recu.fiches && S.chargement) { S.chargement = false; clearTimeout(attente); S.calc = null; rendreDouce(); } };
+      this.desab.push(() => clearTimeout(attente));
+      this.desab.push(this.db.doc('semaines/' + cle).onSnapshot(d => {
         if (!S.semaine || S.semaine.cle !== cle) return;
-        S.semaine = d.exists ? Object.assign(semaineVide(cle), d.data()) : semaineVide(cle);
-        S.calc = null;
-        rendreDouce();
-      }, e => { clearTimeout(attente); S.chargement = false; console.warn('semaine', e); toast('Impossible de lire la semaine partagée (' + e.code + ').'); rendreDouce(); });
+        this.existe[cle] = d.exists;
+        const r = d.exists ? copie(d.data()) : {};
+        const s = S.semaine;
+        const choix = {}; Object.keys(r.choix || {}).forEach(k => { choix[k] = choixDepuisMemoire(r.choix[k]); });
+        Object.keys(s.choix || {}).forEach(k => { if (this.protege('choix:' + k)) choix[k] = s.choix[k]; });
+        s.choix = choix;
+        const stock = Object.assign({}, r.stock || {});
+        Object.keys(s.stock || {}).forEach(k => { if (this.protege('stock:' + k)) stock[k] = s.stock[k]; });
+        Object.keys(stock).forEach(k => { if (!(stock[k] > 0)) delete stock[k]; });
+        s.stock = stock;
+        if (!this.protege('options')) s.options = r.options || {};
+        if (!this.protege('pdf')) s.pdf = r.pdf || null;
+        s.retour = r.retour || null;
+        if (!d.metadata || !d.metadata.fromCache) this.recu.doc = true;
+        S.calc = null; pret(); if (!S.chargement) rendreDouce();
+      }, e => { this.erreurLecture(e); }));
+      this.desab.push(this.db.collection('semaines/' + cle + '/fiches').onSnapshot(q => {
+        if (!S.semaine || S.semaine.cle !== cle) return;
+        const distantes = q.docs.filter(d => d.exists).map(d => copie(d.data()));
+        const locales = S.semaine.fiches || [];
+        const fiches = distantes.filter(f => !this.protege('fiche:' + f.id)).concat(locales.filter(f => this.protege('fiche:' + f.id)));
+        // une fiche supprimée ici mais pas encore effacée là-bas ne revient pas
+        S.semaine.fiches = fiches.filter(f => !(this.sale && this.sale.supprimees.has(f.id)) && !this.enVol['suppr:' + f.id])
+          .sort((a, b) => String(a.ajouteLe || '').localeCompare(String(b.ajouteLe || '')));
+        if (!q.metadata || !q.metadata.fromCache) this.recu.fiches = true;
+        S.calc = null; pret(); if (!S.chargement) rendreDouce();
+      }, e => { this.erreurLecture(e); }));
     },
-    /** Modification locale : enregistrée 0,9 s après la dernière frappe (une écriture à la fois). */
-    sauverSemaine() {
-      this.version++;
+    erreurLecture(e) {
+      console.warn('semaine', e);
+      S.chargement = false;
+      if (e && e.code === 'revoked') { S.lectureSeule = true; }
+      toast('Impossible de lire la semaine partagée (' + ((e && e.code) || 'erreur') + ').');
+      rendreDouce();
+    },
+    /** Une clé est protégée tant que sa modification locale n'est pas enregistrée. */
+    protege(k) { return !!((this.sale && this.sale.cles.has(k)) || this.enVol[k] > 0); },
+
+    /** Compare avant / après une modification et note ce qui doit être écrit. */
+    noter(avant, apres) {
+      if (!this.db) { this.planifierLocal(); return; }
+      if (!this.sale || this.sale.cle !== apres.cle) { this.vidanger(); this.sale = { cle: apres.cle, cles: new Set(), fiches: new Set(), supprimees: new Set() }; }
+      const sale = this.sale;
+      const ids = new Set((apres.fiches || []).map(f => f.id));
+      (apres.fiches || []).forEach(f => { if (avant.fiches[f.id] !== JSON.stringify(f)) { sale.fiches.add(f.id); sale.supprimees.delete(f.id); sale.cles.add('fiche:' + f.id); } });
+      Object.keys(avant.fiches).forEach(id => { if (!ids.has(id)) { sale.supprimees.add(id); sale.fiches.delete(id); sale.cles.add('fiche:' + id); } });
+      Object.keys(Object.assign({}, avant.choix, apres.choix || {})).forEach(k => { if (avant.choix[k] !== JSON.stringify((apres.choix || {})[k])) sale.cles.add('choix:' + k); });
+      Object.keys(Object.assign({}, avant.stock, apres.stock || {})).forEach(k => { if (avant.stock[k] !== (apres.stock || {})[k]) sale.cles.add('stock:' + k); });
+      if (avant.options !== JSON.stringify(apres.options || {})) sale.cles.add('options');
+      if (avant.pdf !== JSON.stringify(apres.pdf || null)) sale.cles.add('pdf');
       clearTimeout(this.minuteur);
-      this.minuteur = setTimeout(() => this.enregistrer(), 900);
+      this.minuteur = setTimeout(() => this.vidanger(), 700);
     },
-    /** Enregistre tout de suite (avant de changer de semaine, par exemple). */
-    enregistrer() {
+    planifierLocal() {
+      clearTimeout(this.minuteur);
+      this.minuteur = setTimeout(() => { if (S.semaine) lsSet('semaine:' + S.semaine.cle, S.semaine); }, 400);
+    },
+    /** Écrit tout de suite ce qui a changé (aussi appelé avant de changer de semaine). */
+    vidanger() {
       clearTimeout(this.minuteur); this.minuteur = null;
-      if (!this.enAttente || !S.semaine) return this.enCours;
-      const v = this.version;
-      const doc = JSON.parse(JSON.stringify(S.semaine));
-      doc.maj = new Date().toISOString(); doc.majPar = S.moi.id;
-      if (!this.db) { lsSet('semaine:' + doc.cle, doc); this.enregistree = v; return this.enCours; }
-      this.enCours = this.enCours.then(() => this.db.doc('semaines/' + doc.cle).set(doc)).then(() => {
-        if (this.version === v) this.enregistree = v;
-      }).catch(e => {
-        console.warn(e);
-        this.enregistree = v; // on n'insiste pas : l'état local reste affiché
-        toast(e.code === 'quota_exceeded' ? 'Mémoire partagée pleine : supprimez d\u2019anciennes semaines.' : 'Enregistrement partagé impossible (' + e.code + ').');
+      if (!this.db) { if (S.semaine) lsSet('semaine:' + S.semaine.cle, S.semaine); return; }
+      const sale = this.sale; this.sale = null;
+      if (!sale || !S.semaine || S.semaine.cle !== sale.cle) return;
+      const s = S.semaine; const cle = sale.cle; const base = 'semaines/' + cle;
+      const maj = {};
+      sale.cles.forEach(k => {
+        if (k.indexOf('choix:') === 0) { const c = k.slice(6); (maj.choix = maj.choix || {})[c] = choixVersMemoire(s.choix[c]); }
+        else if (k.indexOf('stock:') === 0) { const c = k.slice(6); (maj.stock = maj.stock || {})[c] = s.stock[c] > 0 ? s.stock[c] : 0; }
+        else if (k === 'options') maj.options = copie(s.options || {});
+        else if (k === 'pdf') maj.pdf = copie(s.pdf);
       });
-      return this.enCours;
+      const cles = Array.from(sale.cles).filter(k => k.indexOf('fiche:') !== 0);
+      if (Object.keys(maj).length) {
+        maj.maj = new Date().toISOString(); maj.majPar = S.moi.id;
+        cles.forEach(k => { this.enVol[k] = (this.enVol[k] || 0) + 1; });
+        this.enchainer(base, () => {
+          if (this.existe[cle]) return this.db.doc(base).update(maj);
+          this.existe[cle] = true;
+          return this.db.doc(base).set(Object.assign({ cle }, maj));
+        }).finally(() => { cles.forEach(k => { this.enVol[k]--; }); });
+      }
+      sale.fiches.forEach(id => {
+        const f = s.fiches.find(x => x.id === id); if (!f) return;
+        const doc = copie(f); const k = 'fiche:' + id;
+        this.enVol[k] = (this.enVol[k] || 0) + 1;
+        if (!this.existe[cle]) { this.existe[cle] = true; this.enchainer(base, () => this.db.doc(base).set({ cle, maj: new Date().toISOString() })); }
+        this.enchainer(base + '/fiches/' + id, () => this.db.doc(base + '/fiches/' + id).set(doc)).finally(() => { this.enVol[k]--; });
+      });
+      sale.supprimees.forEach(id => {
+        const k = 'fiche:' + id;
+        this.enVol[k] = (this.enVol[k] || 0) + 1; this.enVol['suppr:' + id] = (this.enVol['suppr:' + id] || 0) + 1;
+        this.enchainer(base + '/fiches/' + id, () => this.db.doc(base + '/fiches/' + id)['delete']()).finally(() => { this.enVol[k]--; this.enVol['suppr:' + id]--; });
+      });
     },
-    async sauverApprentissage(nom, data) {
-      S.app[nom] = data;
-      if (!this.db) { lsSet('app:' + nom, data); return; }
-      try { await this.db.doc('apprentissage/' + nom).set(data); } catch (e) { console.warn(e); toast('Apprentissage non enregistré (' + e.code + ').'); }
+
+    /* ---------- apprentissages, toques ---------- */
+    /** Remplace tout un document d'apprentissage (habitudes, carnet, réglages, référentiel). */
+    sauverApprentissage(nom, data) {
+      S.app[nom] = copie(data);
+      reindexer();
+      if (!this.db) { lsSet('app:' + nom, S.app[nom]); rendreDouce(); return Promise.resolve(); }
+      return this.ecrireDernier('apprentissage/' + nom, () => S.app[nom]);
     },
-    async listerSemaines() {
+    /** Ajoute, modifie ou retire une entrée d'une carte partagée (alias, coefficients, fournisseurs). */
+    sauverEntree(nom, cle, valeur) {
+      const carte = Object.assign({}, S.app[nom] || {});
+      if (valeur == null) delete carte[cle]; else carte[cle] = copie(valeur);
+      S.app[nom] = carte;
+      reindexer();
+      if (!this.db) { lsSet('app:' + nom, carte); rendreDouce(); return Promise.resolve(); }
+      const chemin = 'apprentissage/' + nom;
+      const maj = {}; maj[cle] = valeur == null ? { _supprime: true, le: new Date().toISOString() } : copie(valeur);
+      return this.enchainer(chemin, async () => {
+        const ref = this.db.doc(chemin);
+        try { await ref.update(maj); } catch (e) { if (e && e.code === 'invalid_argument' && !(await ref.get()).exists) await ref.set(maj); else throw e; }
+      });
+    },
+    async listerSemaines(forcer) {
       if (!this.db) {
         const out = [];
         try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.indexOf('brigade:semaine:') === 0) out.push(JSON.parse(localStorage.getItem(k))); } } catch (e) { /* rien */ }
         return out;
       }
-      try { const q = await this.db.collection('semaines').get(); return q.docs.filter(d => d.exists).map(d => d.data()); } catch (e) { return []; }
+      if (!forcer && this.cacheSemaines && Date.now() - this.cacheSemaines.le < 60000) return this.cacheSemaines.liste;
+      try {
+        const q = await this.db.collection('semaines').get();
+        const liste = q.docs.filter(d => d.exists).map(d => copie(d.data()));
+        this.cacheSemaines = { le: Date.now(), liste };
+        return liste;
+      } catch (e) { return []; }
     },
-    async lireSemaine(cle) {
-      if (!this.db) return lsGet('semaine:' + cle, null);
-      try { const d = await this.db.doc('semaines/' + cle).get(); return d.exists ? d.data() : null; } catch (e) { return null; }
+    /** Enregistre le retour de service d'une semaine (sans toucher au reste du document). */
+    async ecrireRetour(cle, retour) {
+      if (!this.db) { const doc = copie(lsGet('semaine:' + cle, null)) || semaineVide(cle); doc.retour = retour; lsSet('semaine:' + cle, doc); return; }
+      this.cacheSemaines = null;
+      const ref = this.db.doc('semaines/' + cle);
+      await this.enchainer('semaines/' + cle, async () => {
+        try { await ref.update({ retour }); } catch (e) { if (e && e.code === 'invalid_argument' && !(await ref.get()).exists) await ref.set({ cle, retour }); else throw e; }
+      });
     },
-    async ecrireSemaine(doc) {
-      if (!this.db) { lsSet('semaine:' + doc.cle, doc); return; }
-      await this.db.doc('semaines/' + doc.cle).set(doc);
-    },
-    async points(action, n) {
+    points(action, n) {
       const id = this.cleDoc(S.moi.id);
-      const b = Object.assign({ points: 0, actions: {} }, S.brigade[id] || {});
+      const b = Object.assign({ points: 0, actions: {} }, copie(S.brigade[id]) || {});
       b.actions = Object.assign({}, b.actions); b.points = (b.points || 0) + n; b.actions[action] = (b.actions[action] || 0) + 1; b.maj = new Date().toISOString();
       S.brigade[id] = b; majMoi();
+      if (S.lectureSeule) return;
       if (!this.db) { lsSet('brigade', S.brigade); return; }
-      try { await this.db.doc('brigade/' + id).set(b); } catch (e) { console.warn(e); }
+      const k = 'brigade/' + id;
+      this.enVol[k] = (this.enVol[k] || 0) + 1;
+      this.ecrireDernier(k, () => S.brigade[id]).finally(() => { this.enVol[k]--; });
     },
   };
-  function modifier(fn, sansRendu) { fn(S.semaine); S.calc = null; Memoire.sauverSemaine(); if (!sansRendu) rendre(); }
+  /** Les choix du chef sont stockés en liste (les objets imbriqués fusionneraient avec l'ancien choix). */
+  function choixVersMemoire(c) { return c ? { recettes: Object.keys(c.recettes || {}).map(k => [k, c.recettes[k]]), valide: !!c.valide } : { recettes: [], valide: false }; }
+  function choixDepuisMemoire(c) {
+    if (!c) return c;
+    const r = {}; (Array.isArray(c.recettes) ? c.recettes : Object.entries(c.recettes || {})).forEach(([k, v]) => { if (v > 0) r[k] = v; });
+    return { recettes: r, valide: !!c.valide };
+  }
+  function empreinte(s) {
+    const f = {}; (s.fiches || []).forEach(x => { f[x.id] = JSON.stringify(x); });
+    const ch = {}; Object.keys(s.choix || {}).forEach(k => { ch[k] = JSON.stringify(s.choix[k]); });
+    return { fiches: f, choix: ch, stock: Object.assign({}, s.stock || {}), options: JSON.stringify(s.options || {}), pdf: JSON.stringify(s.pdf || null) };
+  }
+  /** Toute modification de la semaine passe par ici : on vérifie qu'on peut écrire, puis on note ce qui change. */
+  function modifier(fn, sansRendu) {
+    if (S.lectureSeule) { toast('Lecture seule : demandez un accès Contributeur pour modifier la semaine.'); return false; }
+    if (S.chargement) { toast('La semaine partagée se charge encore : un instant…'); return false; }
+    const avant = empreinte(S.semaine);
+    fn(S.semaine);
+    S.calc = null;
+    Memoire.noter(avant, S.semaine);
+    if (!sansRendu) rendre();
+    return true;
+  }
 
   /* ------------------------------------------------------------------ *
    * Index et calcul
@@ -293,8 +448,12 @@
       try {
         const id = await S.caps.user.id(); if (id) S.moi.id = id;
         const me = await S.caps.user.me(); if (me && me.name) S.moi.nom = me.name.split(' ')[0];
+        // can('data.write') : false = lecture seule ; null = non précisé, on laisse saisir et un refus bascule en lecture seule
+        const peut = S.caps.user.can ? await S.caps.user.can('data.write') : null;
+        if (peut === false && S.caps.db) S.lectureSeule = true;
       } catch (e) { /* anonyme */ }
     }
+    if (S.caps.dictation) brancherDictee(S.caps.dictation);
   }
   function messageErreurClaude(e) {
     const c = e && e.code;
@@ -324,7 +483,7 @@
   function resumeCarnet(n) {
     return ((S.app.carnet && S.app.carnet.notes) || []).slice(-(n || 15)).map(x => '- ' + x.texte).join('\n') || '(vide)';
   }
-  async function claudeLire(texte, nomFichier) {
+  async function claudeLire(texte, nomFichier, forcer) {
     const sample = S.caps.sample; if (!sample) return null;
     const prompt = `Tu aides la cuisine du Manoir de Procé (Nantes : séminaires, cocktails, repas assis, brunchs) à préparer ses commandes fournisseurs.
 Lis ce document (un devis client ou une fiche de fonction « FF ») et extrais ce que la cuisine doit produire, jour par jour.
@@ -361,7 +520,8 @@ DOCUMENT :
 <<<
 ${texte.slice(0, 16000)}
 >>>`;
-    return sample.json(prompt, { modelTier: 'default' });
+    // même réglage de cache à chaque appel ; « relire » force une nouvelle lecture
+    return sample.json(prompt, { modelTier: 'default', cache: forcer ? { gcTime: 300000, refresh: true } : { gcTime: 300000 } });
   }
 
   /* ------------------------------------------------------------------ *
@@ -389,34 +549,55 @@ ${texte.slice(0, 16000)}
     let id = f.id; let k = 2;
     while (S.semaine.fiches.some(x => x.id === id && x.nomFichier !== f.nomFichier)) id = f.id + '-' + k++;
     f.id = id;
+    if (!modifier(s => { s.fiches = s.fiches.filter(x => !(x.nomFichier === f.nomFichier && f.nomFichier)).concat([f]); })) return null;
     S.textes[f.id] = texte;
-    modifier(s => { s.fiches = s.fiches.filter(x => !(x.nomFichier === f.nomFichier && f.nomFichier)).concat([f]); });
     Memoire.points('fiche', 1);
     if (S.caps.sample && texte.trim().length > 40) relireAvecClaude(f.id);
     return f;
   }
   const fileClaude = []; let claudeActifs = 0;
-  function relireAvecClaude(id) {
+  function relireAvecClaude(id, forcer) {
+    if (fileClaude.some(x => x.id === id)) return;
     S.lectures[id] = 'attente'; rendreSiVue('fiches');
-    fileClaude.push(id); pomperClaude();
+    fileClaude.push({ id, forcer: !!forcer, cle: S.semaine.cle }); pomperClaude();
+  }
+  /** Reporte sur la nouvelle lecture ce que l'équipe a corrigé à la main (formules, lignes ignorées, dates, convives). */
+  function garderCorrections(base, nv) {
+    const parLib = {};
+    (base.jours || []).forEach(j => (j.prestations || []).forEach(p => { if (p.via === 'main' || p.ignoree) parLib[M.cleAlias(p.libelle)] = p; }));
+    nv.jours.forEach(j => {
+      const old = (base.jours || []).find(o => o.date === j.date);
+      if (old && old.convivesForces) { j.convives = old.convives; j.convivesForces = true; }
+      (j.prestations || []).forEach(p => {
+        const o = parLib[M.cleAlias(p.libelle)];
+        if (o) { p.forfaits = o.forfaits.slice(); p.via = o.via; p.ignoree = !!o.ignoree; p.horsCuisine = o.horsCuisine; p.confiance = 1; }
+      });
+    });
+    // un jour daté à la main que Claude n'a pas retrouvé reste
+    (base.jours || []).forEach(j => { if (j.date && !nv.jours.some(x => x.date === j.date) && (j.prestations || []).some(p => p.via === 'main')) nv.jours.push(j); });
+    nv.dates = nv.jours.map(j => j.date).filter(Boolean);
+    return nv;
   }
   function pomperClaude() {
     while (claudeActifs < 2 && fileClaude.length) {
-      const id = fileClaude.shift(); claudeActifs++;
-      S.lectures[id] = 'en-cours'; rendreSiVue('fiches');
-      const fiche = S.semaine.fiches.find(x => x.id === id);
+      const tache = fileClaude.shift(); const id = tache.id; claudeActifs++;
+      const fiche = S.semaine.cle === tache.cle && S.semaine.fiches.find(x => x.id === id);
       const texte = S.textes[id];
       if (!fiche || !texte) { claudeActifs--; delete S.lectures[id]; continue; }
-      claudeLire(texte, fiche.nomFichier || fiche.client).then(rep => {
-        const base = S.semaine.fiches.find(x => x.id === id); if (!base) return;
-        const nv = assainirFiche(appliquerAlias(M.normaliserLectureClaude(rep, base, S.idx)));
-        // conserve les corrections humaines de convives
-        nv.jours.forEach(j => { const old = (base.jours || []).find(o => o.date === j.date); if (old && old.convivesForces) { j.convives = old.convives; j.convivesForces = true; } });
-        modifier(s => { s.fiches = s.fiches.map(x => x.id === id ? nv : x); });
-        S.lectures[id] = 'claude';
+      S.lectures[id] = 'en-cours'; rendreSiVue('fiches');
+      claudeLire(texte, fiche.nomFichier || fiche.client, tache.forcer).then(rep => {
+        const base = S.semaine.cle === tache.cle && S.semaine.fiches.find(x => x.id === id);
+        if (!base) { delete S.lectures[id]; return; } // semaine changée ou fiche décrochée entre-temps
+        const nv = garderCorrections(base, assainirFiche(appliquerAlias(M.normaliserLectureClaude(rep, base, S.idx))));
+        if (modifier(s => { s.fiches = s.fiches.map(x => x.id === id ? nv : x); }, true)) S.lectures[id] = 'claude';
+        else delete S.lectures[id];
       }).catch(e => {
         S.lectures[id] = 'erreur:' + messageErreurClaude(e);
-        if (claudeIndisponible(e)) { S.caps.sample = null; fileClaude.length = 0; toast(messageErreurClaude(e)); }
+        if (claudeIndisponible(e)) {
+          S.caps.sample = null;
+          fileClaude.forEach(t => { delete S.lectures[t.id]; }); fileClaude.length = 0;
+          toast(messageErreurClaude(e));
+        }
       }).finally(() => { claudeActifs--; rendreSiVue('fiches'); pomperClaude(); });
     }
   }
@@ -461,15 +642,17 @@ ${texte.slice(0, 16000)}
    * Google Drive (connecteur de l'utilisateur)
    * ------------------------------------------------------------------ */
   const DRIVE = 'Google Drive';
+  const TYPES_DRIVE = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.google-apps.document', 'text/plain'];
   function codesSemaine() { return S.sem.jours.map(d => d.slice(8, 10) + d.slice(5, 7) + d.slice(2, 4)); }
   async function chercherDrive() {
     const mcp = S.caps.mcp; if (!mcp) return;
-    const q = '(' + codesSemaine().map(c => "title contains '" + c + "'").join(' or ') + ") and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
+    const q = '(' + codesSemaine().map(c => "title contains '" + c + "'").join(' or ') + ') and trashed = false and (' + TYPES_DRIVE.map(t => "mimeType = '" + t + "'").join(' or ') + ')';
     const btn = $('#btnDrive'); btn.disabled = true; btn.textContent = 'Recherche dans le Drive…';
     try {
       const res = await mcp.callTool(DRIVE, 'search_files', { query: q, pageSize: 60, excludeContentSnippets: true });
       const p = res.payload || {};
-      const fichiers = (Array.isArray(p.files) ? p.files : []).filter(f => /devis|^\d{6}|fiche|ff/i.test(f.title || '') || /pdf|word|document/.test(f.mimeType || ''));
+      // seulement des devis et fiches (PDF, Word, Google Docs) : jamais de tableur ni de présentation
+      const fichiers = (Array.isArray(p.files) ? p.files : []).filter(f => TYPES_DRIVE.indexOf(f.mimeType) >= 0);
       choisirFichiersDrive(fichiers);
     } catch (e) {
       const msg = ({
@@ -525,8 +708,8 @@ ${texte.slice(0, 16000)}
       h('button', { class: 'btn fantome', type: 'button', onclick: fermer }, 'Annuler'),
       (boutons || []).map(b => h('button', {
         class: 'btn ' + (b.classe || ''), type: 'button', onclick: async (ev) => {
-          ev.currentTarget.disabled = true;
-          try { const garder = await b.action(fen); if (!garder) fermer(); } finally { if (ev.currentTarget) ev.currentTarget.disabled = false; }
+          const bt = ev.currentTarget; bt.disabled = true;
+          try { const garder = await b.action(fen); if (!garder) fermer(); } finally { bt.disabled = false; }
         },
       }, b.texte)));
     fen.appendChild(actions);
@@ -592,19 +775,17 @@ ${texte.slice(0, 16000)}
   function apprendre(prestation, forfaits) {
     const texte = [prestation.libelle].concat(prestation.details || []).join(' · ');
     const cle = M.cleAlias(texte);
-    const alias = Object.assign({}, S.app.alias || {});
-    alias[cle] = { forfaits: forfaits.slice(), libelle: prestation.libelle.slice(0, 160), par: S.moi.id, le: new Date().toISOString(), n: ((alias[cle] && alias[cle].n) || 0) + 1 };
-    // garde le carnet raisonnable
-    const cles = Object.keys(alias); if (cles.length > 400) cles.sort((a, b) => (alias[a].le || '').localeCompare(alias[b].le || '')).slice(0, cles.length - 400).forEach(k => delete alias[k]);
-    Memoire.sauverApprentissage('alias', alias);
+    const ancien = (S.app.alias || {})[cle];
+    Memoire.sauverEntree('alias', cle, { forfaits: forfaits.slice(), libelle: prestation.libelle.slice(0, 160), par: S.moi.id, le: new Date().toISOString(), n: ((ancien && ancien.n) || 0) + 1 });
     Memoire.points('apprendre', 3);
   }
   function majPrestation(ficheId, presId, fn, apprentissage) {
-    modifier(s => {
+    if (S.lectures[ficheId] === 'attente' || S.lectures[ficheId] === 'en-cours') { toast('Claude relit cette fiche : attendez la fin de sa lecture pour la corriger.'); return; }
+    const ok = modifier(s => {
       const f = s.fiches.find(x => x.id === ficheId); if (!f) return;
       f.jours.forEach(j => j.prestations.forEach(p => { if (p.id === presId) fn(p); }));
     });
-    if (apprentissage) {
+    if (ok && apprentissage) {
       const f = S.semaine.fiches.find(x => x.id === ficheId);
       const p = f && f.jours.flatMap(j => j.prestations).find(x => x.id === presId);
       if (p) { apprendre(p, p.forfaits); toast('Noté : la prochaine fois je reconnaîtrai cette ligne.', 'Merci chef !'); }
@@ -648,7 +829,7 @@ ${texte.slice(0, 16000)}
         h('button', { class: 'btn fantome petit', type: 'button', 'aria-label': 'Décrocher la fiche', title: 'Décrocher', onclick: () => modifier(s => { s.fiches = s.fiches.filter(x => x.id !== f.id); }) }, '✕')),
       h('div', { class: 'puces', style: { marginTop: '6px' } }, statut,
         f.source === 'drive' ? h('span', { class: 'puce neutre' }, 'Drive') : null, f.exemple ? h('span', { class: 'puce attention' }, 'Exemple') : null,
-        S.caps.sample && S.textes[f.id] && lecture !== 'en-cours' && lecture !== 'attente' ? h('button', { class: 'lien', type: 'button', onclick: () => relireAvecClaude(f.id), style: { fontSize: '.78rem' } }, lecture === 'claude' ? 'relire' : 'faire relire par Claude') : null),
+        S.caps.sample && S.textes[f.id] && lecture !== 'en-cours' && lecture !== 'attente' ? h('button', { class: 'lien', type: 'button', onclick: () => relireAvecClaude(f.id, lecture === 'claude'), style: { fontSize: '.78rem' } }, lecture === 'claude' ? 'relire' : 'faire relire par Claude') : null),
       f.nomFichier ? h('div', { class: 'ligne-fichier' }, f.nomFichier) : null,
       (f.regimes || []).length ? h('div', { class: 'regimes', style: { marginTop: '8px' } }, f.regimes.slice(0, 3).join(' · ')) : null,
       h('hr'),
@@ -806,7 +987,7 @@ ${texte.slice(0, 16000)}
     const act = $('#actionsInventaire'); vider(act);
     const lignes = lignesInventaire(c);
     if (!lignes.length) { zone.appendChild(videVers('Rien à inventorier.', 'L’inventaire se remplit dès qu’il y a des services dans la semaine.', '#fiches', 'Aller aux fiches')); return; }
-    if (S.caps.dictation && S.caps.sample) act.appendChild(boutonDictee(lignes));
+    if (S.caps.dictation && S.caps.sample && !Dictee.indispo) act.appendChild(boutonDictee());
     act.appendChild(h('button', { class: 'btn', type: 'button', onclick: () => { Memoire.points('inventaire', 2); toast('Inventaire enregistré.', 'Oui chef !'); location.hash = '#bons'; } }, 'Inventaire fait →'));
     const parF = {};
     lignes.forEach(l => { (parF[l.fournisseur] = parF[l.fournisseur] || []).push(l); });
@@ -816,7 +997,7 @@ ${texte.slice(0, 16000)}
       parF[fn].forEach(l => {
         const us = uniteSaisie(l.base);
         const val = S.semaine.stock && S.semaine.stock[l.cle];
-        const inp = h('input', { class: 'stock-input', type: 'number', min: '0', step: us.f > 1 ? '0.1' : '1', inputmode: 'decimal', value: val ? M.arrondi(val / us.f, 3) : '', 'aria-label': 'En stock : ' + l.produit + ' (' + us.u + ')', placeholder: '0' });
+        const inp = h('input', { id: 'stock-' + M.slug(l.cle), class: 'stock-input', type: 'number', min: '0', step: us.f > 1 ? '0.1' : '1', inputmode: 'decimal', value: val ? M.arrondi(val / us.f, 3) : '', 'aria-label': 'En stock : ' + l.produit + ' (' + us.u + ')', placeholder: '0' });
         // pas de nouveau rendu : on garde le focus pour enchaîner la saisie au clavier
         inp.addEventListener('change', () => modifier(s => { s.stock = s.stock || {}; const v = parseFloat(String(inp.value).replace(',', '.')); if (v > 0) s.stock[l.cle] = v * us.f; else delete s.stock[l.cle]; }, true));
         tb.appendChild(h('tr', null, h('td', null, l.produit), h('td', { class: 'qte' }, M.formatQte(l.qte, l.base)), h('td', { class: 'qte' }, inp, ' ', h('span', { class: 'note' }, us.u))));
@@ -825,27 +1006,45 @@ ${texte.slice(0, 16000)}
     });
     zone.appendChild(grille);
   }
-  function boutonDictee(lignes) {
-    const btn = h('button', { class: 'btn clair', type: 'button' }, 'Dicter l’inventaire');
-    let texte = ''; let actif = false;
-    const d = S.caps.dictation;
-    btn.addEventListener('click', () => {
-      if (actif) { d.stop().catch(() => {}); return; }
-      texte = '';
-      d.start().catch(e => { if (e && e.code === 'not_granted') { btn.hidden = true; toast('Micro refusé : saisissez l’inventaire au clavier.'); } });
+  /** Dictée : un seul abonnement pour toute la session ; l'inventaire dicté est interprété au retour à « idle ». */
+  const Dictee = { d: null, texte: '', etat: 'idle', bouton: null, indispo: false };
+  function brancherDictee(d) {
+    Dictee.d = d;
+    d.onFinal(({ text }) => { Dictee.texte += text; });
+    d.onState(({ state, reason }) => {
+      Dictee.etat = state;
+      if (state === 'idle') {
+        if (reason === 'unavailable' || reason === 'not_granted') { Dictee.indispo = true; toast('Dictée indisponible ici : saisissez l\u2019inventaire au clavier.'); }
+        else if (reason === 'rate_limited') toast('Le micro est occupé : réessayez dans un instant.');
+        else if (reason === 'upstream_error') toast('Le micro ou la reconnaissance vocale a échoué : réessayez.');
+        const t = Dictee.texte.trim(); Dictee.texte = '';
+        if (t) interpreterDictee(t);
+      }
+      majBoutonDictee();
     });
-    d.onFinal(({ text }) => { texte += ' ' + text; });
-    d.onState(({ state }) => {
-      actif = state === 'listening';
-      btn.textContent = actif ? 'J’écoute… (cliquez pour finir)' : 'Dicter l’inventaire';
-      if (!actif && texte.trim()) interpreterDictee(texte.trim(), lignes);
+  }
+  function majBoutonDictee() {
+    const btn = Dictee.bouton; if (!btn || !btn.isConnected) return;
+    btn.hidden = Dictee.indispo;
+    btn.textContent = Dictee.etat === 'idle' ? 'Dicter l\u2019inventaire' : Dictee.etat === 'finishing' ? 'Je note…' : 'J\u2019écoute… (cliquez pour finir)';
+  }
+  function boutonDictee() {
+    const btn = h('button', { class: 'btn clair', type: 'button', id: 'btnDictee' }, 'Dicter l\u2019inventaire');
+    Dictee.bouton = btn; majBoutonDictee();
+    btn.addEventListener('click', () => {
+      if (Dictee.etat !== 'idle') { Dictee.d.stop().catch(() => {}); return; }
+      Dictee.texte = '';
+      Dictee.d.start().catch(e => { if (e && e.code === 'not_granted') { Dictee.indispo = true; majBoutonDictee(); toast('Micro refusé : saisissez l\u2019inventaire au clavier.'); } });
     });
     return btn;
   }
-  async function interpreterDictee(texte, lignes) {
-    toast('Claude range l’inventaire dicté…');
+  async function interpreterDictee(texte) {
+    if (!S.caps.sample) return;
+    const lignes = lignesInventaire(calculer()); // lignes du moment, pas celles d'un ancien rendu
+    if (!lignes.length) return;
+    toast('Claude range l\u2019inventaire dicté…');
     try {
-      const rep = await S.caps.sample.json(`Inventaire dicté en cuisine : « ${texte} ».
+      const rep = await S.caps.sample.json(`Inventaire dicté en cuisine : « ${texte.slice(0, 2000)} ».
 Produits à commander cette semaine (index, produit, unité de saisie) :
 ${lignes.map((l, i) => i + ' | ' + l.produit + ' | ' + uniteSaisie(l.base).u).join('\n')}
 Associe chaque quantité dictée au bon produit et convertis-la dans l'unité de saisie. Ignore ce qui ne correspond à aucun produit.
@@ -953,7 +1152,9 @@ Réponds uniquement en JSON : [{"index":0,"quantite":1.5}]`, { modelTier: 'quick
       if (ok) {
         const habitudes = M.majHabitudes(S.app.habitudes || {}, c.evenements.flatMap(e => e.postes));
         Memoire.sauverApprentissage('habitudes', habitudes);
-        modifier(s => { s.pdf = { le: new Date().toISOString(), par: S.moi.id, resume: resumeCommandes(c) }; });
+        const services = c.evenements.map(e => ({ client: e.fiche.client, date: e.jour.date, convives: e.jour.convives || null }));
+        modifier(s => { s.pdf = { le: new Date().toISOString(), par: S.moi.id, resume: resumeCommandes(c), services }; }, true);
+        rendre();
         Memoire.points('pdf', 5);
         toast('Les bons sont partis.', 'Envoyez !');
       }
@@ -974,17 +1175,20 @@ Réponds uniquement en JSON : [{"index":0,"quantite":1.5}]`, { modelTier: 'quick
    * Vue 5 : retour de service
    * ------------------------------------------------------------------ */
   async function rendreRetour() {
+    const g = ++S.genRendu;
+    const semaines = (await Memoire.listerSemaines()).filter(s => s && s.pdf && s.pdf.resume && s.pdf.resume.length).sort((a, b) => b.cle.localeCompare(a.cle));
+    if (g !== S.genRendu || S.vue !== 'retour') return; // un rendu plus récent a pris la main
     const zone = $('#listeRetour'); vider(zone);
     const act = $('#actionsRetour'); vider(act);
-    const semaines = (await Memoire.listerSemaines()).filter(s => s && s.pdf && s.pdf.resume && s.pdf.resume.length).sort((a, b) => b.cle.localeCompare(a.cle));
-    if (S.vue !== 'retour') return;
     if (!semaines.length) { zone.appendChild(videVers('Pas encore de semaine à débriefer.', 'Le retour de service s’ouvre pour chaque semaine dont le PDF a été sorti.', '#bons', 'Aller aux bons')); return; }
     if (!S.retourCle || !semaines.some(s => s.cle === S.retourCle)) S.retourCle = (semaines.find(s => s.cle < S.semaine.cle) || semaines[0]).cle;
-    const sel = h('select', { class: 'ajout', 'aria-label': 'Semaine à débriefer' }, semaines.map(s => h('option', { value: s.cle, selected: s.cle === S.retourCle }, 'Semaine ' + s.cle.split('-S')[1] + ' (' + s.cle.slice(0, 4) + ')' + (s.retour ? ' · faite' : ''))));
+    const sel = h('select', { class: 'ajout', id: 'retourSemaine', 'aria-label': 'Semaine à débriefer' }, semaines.map(s => h('option', { value: s.cle, selected: s.cle === S.retourCle }, 'Semaine ' + s.cle.split('-S')[1] + ' (' + s.cle.slice(0, 4) + ')' + (s.retour ? ' · faite' : ''))));
     sel.addEventListener('change', () => { S.retourCle = sel.value; rendreRetour(); });
     act.appendChild(sel);
     const doc = semaines.find(s => s.cle === S.retourCle);
-    const verdicts = Object.assign({}, (doc.retour && doc.retour.lignes) || {});
+    // le brouillon (verdicts et mot du chef pas encore enregistrés) survit aux nouveaux rendus
+    const br = S.brouillonRetour[doc.cle] || (S.brouillonRetour[doc.cle] = { verdicts: copie((doc.retour && doc.retour.lignes) || {}), note: (doc.retour && doc.retour.note) || '' });
+    const verdicts = br.verdicts;
     const parF = {};
     doc.pdf.resume.filter(l => l.commande > 0 || l.besoin > 0).forEach(l => { (parF[l.fournisseur] = parF[l.fournisseur] || []).push(l); });
     const grille = h('div', { class: 'grille' });
@@ -1002,31 +1206,43 @@ Réponds uniquement en JSON : [{"index":0,"quantite":1.5}]`, { modelTier: 'quick
       });
       grille.appendChild(h('div', { class: 'carte' }, h('h3', null, fn), h('div', { class: 'tableau-wrap' }, h('table', null, tb))));
     });
-    const note = h('textarea', { id: 'retourNote', placeholder: 'Ce qui s’est passé : pièces qui ont plu, restes, ruptures, nombre réel de convives…' }, (doc.retour && doc.retour.note) || '');
+    const note = h('textarea', { id: 'retourNote', placeholder: 'Ce qui s’est passé : pièces qui ont plu, restes, ruptures, nombre réel de convives…' }, br.note);
+    note.addEventListener('input', () => { br.note = note.value; });
     const bulle = h('div', { class: 'claude-bulle', hidden: true });
     if (S.analyseRetour && S.analyseRetour.cle === doc.cle) afficherAnalyse(bulle, S.analyseRetour, doc.cle);
+    const dejaFait = !!doc.retour;
     zone.append(grille,
       h('div', { class: 'carte' }, h('label', { class: 'champ' }, 'Le mot du chef', note), bulle,
-        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: async (ev) => {
-          ev.currentTarget.disabled = true;
-          const coefs = Object.assign({}, S.app.coefficients || {});
-          Object.keys(verdicts).forEach(k => { const v = verdicts[k]; const pk = M.slug(v.produit); coefs[pk] = M.ajusterCoefficient(coefs[pk], v.verdict); coefs[pk].produit = v.produit; });
-          await Memoire.sauverApprentissage('coefficients', coefs);
-          doc.retour = { lignes: verdicts, note: note.value.slice(0, 2000), le: new Date().toISOString(), par: S.moi.id };
-          try { await Memoire.ecrireSemaine(doc); } catch (e) { console.warn(e); }
-          if (doc.cle === S.semaine.cle) S.semaine.retour = doc.retour;
-          Memoire.points('retour', 5);
-          reindexer();
-          toast('Retour enregistré : les prochaines quantités en tiennent compte.', 'Merci chef !');
-          if (S.caps.sample) analyserRetour(doc, verdicts, note.value, bulle);
-          ev.currentTarget.disabled = false;
+        dejaFait ? h('p', { class: 'note' }, 'Retour déjà enregistré le ' + new Date(doc.retour.le).toLocaleDateString('fr-FR') + ' : un nouvel envoi ne réajuste que les produits dont le verdict a changé.') : null,
+        h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', id: 'btnRetour', onclick: async (ev) => {
+          const bt = ev.currentTarget;
+          if (S.lectureSeule) { toast('Lecture seule : demandez un accès Contributeur.'); return; }
+          bt.disabled = true;
+          try {
+            const anciens = (doc.retour && doc.retour.lignes) || {};
+            const retour = { lignes: copie(br.verdicts), note: br.note.slice(0, 2000), le: new Date().toISOString(), par: S.moi.id };
+            await Memoire.ecrireRetour(doc.cle, retour); // d'abord la semaine : sans elle, on n'ajuste rien
+            // un produit déjà jugé avec le même verdict n'est pas réajusté une seconde fois
+            for (const k of Object.keys(retour.lignes)) {
+              const v = retour.lignes[k];
+              if (anciens[k] && anciens[k].verdict === v.verdict) continue;
+              const pk = M.slug(v.produit);
+              const nv = M.ajusterCoefficient((S.app.coefficients || {})[pk], v.verdict); nv.produit = v.produit;
+              await Memoire.sauverEntree('coefficients', pk, nv);
+            }
+            doc.retour = retour; S.brouillonRetour[doc.cle] = null;
+            if (doc.cle === S.semaine.cle) S.semaine.retour = retour;
+            if (!dejaFait) Memoire.points('retour', 5);
+            toast('Retour enregistré : les prochaines quantités en tiennent compte.', 'Merci chef !');
+            if (S.caps.sample) analyserRetour(doc, retour.lignes, retour.note, bulle);
+          } catch (e) { Memoire.erreur(e); } finally { bt.disabled = false; }
         } }, S.caps.sample ? 'Enregistrer et demander l’avis de Claude' : 'Enregistrer le retour'))));
   }
   async function analyserRetour(doc, verdicts, note, bulle) {
     bulle.hidden = false; bulle.textContent = 'Claude tire les leçons de la semaine…';
     try {
       const rep = await S.caps.sample.json(`Tu es le second du chef au Manoir de Procé. Voici le retour de service de la semaine ${doc.cle}.
-Services de la semaine : ${(doc.fiches || []).map(f => f.client + ' (' + (f.dates || []).join(', ') + ', ' + (f.convives || '?') + ' pers.)').join(' ; ')}
+Services de la semaine : ${servicesDe(doc).join(' ; ') || 'non précisés'}
 Verdicts par produit : ${Object.values(verdicts).map(v => v.produit + ' = ' + v.verdict).join(' ; ') || 'aucun'}
 Le mot du chef : « ${note || '—'} »
 Ce que tu sais déjà (carnet) :
@@ -1039,12 +1255,17 @@ Réponds uniquement en JSON : {"resume":"une phrase","notes":["enseignement 1"]}
       afficherAnalyse(cible, S.analyseRetour, doc.cle);
     } catch (e) { bulle.textContent = messageErreurClaude(e); }
   }
+  /** Services d'une semaine : résumé gardé avec le PDF (mémoire partagée) ou fiches (mémoire locale). */
+  function servicesDe(doc) {
+    if (doc.pdf && Array.isArray(doc.pdf.services)) return doc.pdf.services.map(x => x.client + ' (' + x.date + ', ' + (x.convives || '?') + ' pers.)');
+    return (doc.fiches || []).map(f => f.client + ' (' + (f.dates || []).join(', ') + ', ' + (f.convives || '?') + ' pers.)');
+  }
   function afficherAnalyse(bulle, a, cle) {
     bulle.hidden = false;
     vider(bulle).append(h('strong', null, a.resume || 'Ce que je retiens :'), h('ul', null, a.notes.map(n => h('li', null, n))));
     if (a.notes.length && !a.retenu) {
       bulle.appendChild(h('button', { class: 'btn petit', type: 'button', onclick: async (e) => {
-        e.currentTarget.disabled = true; a.retenu = true;
+        const bt = e.currentTarget; bt.disabled = true; a.retenu = true;
         const carnet = { notes: ((S.app.carnet && S.app.carnet.notes) || []).concat(a.notes.map(t => ({ texte: t, le: new Date().toISOString(), semaine: cle, source: 'retour' }))).slice(-120) };
         await Memoire.sauverApprentissage('carnet', carnet); toast('Ajouté au carnet de Claude.', 'Oui chef !');
       } }, 'Retenir dans le carnet'));
@@ -1108,6 +1329,7 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
   async function enregistrerReleves(data) {
     const releves = Array.isArray(data) ? data : (data.releves || [data]);
     const four = JSON.parse(JSON.stringify(S.app.fournisseurs || {}));
+    const modifies = [];
     let n = 0;
     releves.forEach(r => {
       if (!r || !r.fournisseur) return;
@@ -1127,8 +1349,9 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
       });
       x.majLe = new Date().toISOString().slice(0, 10); x.source = 'Claude dans Chrome';
       four[k] = x; n++;
+      modifies.push(k);
     });
-    await Memoire.sauverApprentissage('fournisseurs', four);
+    for (const k of modifies) await Memoire.sauverEntree('fournisseurs', k, four[k]);
     reindexer(); rendre();
     if (n) Memoire.points('fournisseur', 3);
     return n;
@@ -1176,8 +1399,7 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
         const x = four[f.slug] || { nom: f.nom };
         champs.forEach(([k]) => { const v = inputs[k].value.trim(); if (/^site/.test(k) && v && !/^https:\/\//.test(v)) return; x[k] = v; });
         x.majLe = new Date().toISOString().slice(0, 10); x.source = 'saisie dans l’appli';
-        four[f.slug] = x;
-        await Memoire.sauverApprentissage('fournisseurs', four); reindexer(); rendre(); toast('Fournisseur à jour.', 'Oui chef !');
+        await Memoire.sauverEntree('fournisseurs', f.slug, x); rendre(); toast('Fournisseur à jour.', 'Oui chef !');
       },
     }]);
   }
@@ -1188,21 +1410,23 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
   function rendreCarnet() {
     const zone = $('#listeCarnet'); vider(zone);
     const act = $('#actionsCarnet'); vider(act);
-    if (S.caps.sample) act.appendChild(h('button', { class: 'btn', type: 'button', onclick: fairePoint }, 'Faire le point avec Claude'));
+    if (S.caps.sample) act.appendChild(h('button', { class: 'btn', type: 'button', onclick: fairePoint, disabled: !!(S.pointClaude && S.pointClaude.enCours) }, 'Faire le point avec Claude'));
+    const point = bullePoint(); if (point) zone.appendChild(point);
     const alias = S.app.alias || {}; const coefs = S.app.coefficients || {}; const hab = S.app.habitudes || {};
     const notes = (S.app.carnet && S.app.carnet.notes) || [];
     const grille = h('div', { class: 'grille' });
     // notes
     grille.appendChild(h('div', { class: 'carte' }, h('h3', null, 'Mes notes'),
-      notes.length ? h('ul', null, notes.slice().reverse().slice(0, 30).map((n, i) => h('li', null, n.texte, ' ', h('span', { class: 'note' }, (n.semaine || n.le || '').slice(0, 10)), ' ',
-        h('button', { class: 'lien', type: 'button', onclick: () => { const all = notes.slice(); all.splice(notes.length - 1 - i, 1); Memoire.sauverApprentissage('carnet', { notes: all }); } }, 'oublier'))))
+      notes.length ? h('ul', null, notes.slice().reverse().slice(0, 30).map(n => h('li', null, n.texte, ' ', h('span', { class: 'note' }, (n.semaine || n.le || '').slice(0, 10)), ' ',
+        // on relit le carnet au moment du clic et on retire la note par son horodatage, pas par sa position
+        h('button', { class: 'lien', type: 'button', onclick: () => { const all = ((S.app.carnet && S.app.carnet.notes) || []).filter(x => !(x.le === n.le && x.texte === n.texte)); Memoire.sauverApprentissage('carnet', { notes: all }); } }, 'oublier'))))
         : h('p', { class: 'note' }, 'Vide pour l’instant. Les notes arrivent avec les retours de service et les points avec Claude.'),
       ajoutNote()));
     // libellés appris
     const cles = Object.keys(alias).sort((a, b) => (alias[b].le || '').localeCompare(alias[a].le || ''));
     grille.appendChild(h('div', { class: 'carte' }, h('h3', null, 'Libellés appris (' + cles.length + ')'),
       cles.length ? h('ul', null, cles.slice(0, 40).map(k => h('li', null, '« ' + (alias[k].libelle || k) + ' » → ', h('strong', null, (alias[k].forfaits || []).map(nomForfait).join(', ') || 'rien pour la cuisine'), ' ',
-        h('button', { class: 'lien', type: 'button', onclick: () => { const a = Object.assign({}, alias); delete a[k]; Memoire.sauverApprentissage('alias', a); } }, 'oublier'))))
+        h('button', { class: 'lien', type: 'button', onclick: () => Memoire.sauverEntree('alias', k, null) }, 'oublier'))))
         : h('p', { class: 'note' }, 'Quand vous corrigez une formule sur une fiche, je retiens le libellé ici.')));
     // habitudes du chef
     const familles = Object.keys(hab);
@@ -1214,7 +1438,7 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
     // coefficients
     const ajustes = Object.keys(coefs).filter(k => coefs[k].coef !== 1);
     grille.appendChild(h('div', { class: 'carte' }, h('h3', null, 'Quantités ajustées'),
-      ajustes.length ? h('table', null, h('tbody', null, ajustes.map(k => h('tr', null, h('td', null, coefs[k].produit || k), h('td', { class: 'qte' }, (coefs[k].coef > 1 ? '+' : '') + Math.round((coefs[k].coef - 1) * 100) + ' %'), h('td', null, h('button', { class: 'lien', type: 'button', onclick: () => { const c2 = Object.assign({}, coefs); delete c2[k]; Memoire.sauverApprentissage('coefficients', c2); reindexer(); } }, 'remettre à zéro'))))))
+      ajustes.length ? h('table', null, h('tbody', null, ajustes.map(k => h('tr', null, h('td', null, coefs[k].produit || k), h('td', { class: 'qte' }, (coefs[k].coef > 1 ? '+' : '') + Math.round((coefs[k].coef - 1) * 100) + ' %'), h('td', null, h('button', { class: 'lien', type: 'button', onclick: () => Memoire.sauverEntree('coefficients', k, null) }, 'remettre à zéro'))))))
         : h('p', { class: 'note' }, 'Les retours de service (il manquait, en trop) ajustent ici les quantités des prochaines commandes.')));
     // activité connue
     const act2 = S.con.activite;
@@ -1249,41 +1473,50 @@ ${t.slice(0, 12000)}`, { modelTier: 'default' });
     });
     return f;
   }
+  /** Le point de Claude est gardé dans l'état : il survit aux nouveaux rendus du carnet. */
+  function bullePoint() {
+    const p = S.pointClaude; if (!p) return null;
+    if (p.enCours) return h('div', { class: 'claude-bulle' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), ' Claude relit le carnet et la semaine…');
+    if (p.erreur) return h('div', { class: 'claude-bulle' }, p.erreur);
+    return h('div', { class: 'claude-bulle' }, h('strong', null, p.resume || 'Le point de Claude'),
+      p.notes.length ? h('ul', null, p.notes.map(n => h('li', null, n))) : null,
+      p.af.length ? h('div', null, h('div', { class: 'etape' }, 'À faire'), h('ul', null, p.af.map(n => h('li', null, n)))) : null,
+      p.notes.length && !p.retenu ? h('button', { class: 'btn petit', type: 'button', onclick: async (e) => {
+        const bt = e.currentTarget; bt.disabled = true; p.retenu = true;
+        const carnet = { notes: ((S.app.carnet && S.app.carnet.notes) || []).concat(p.notes.map(t => ({ texte: t, le: new Date().toISOString(), source: 'point' }))).slice(-120) };
+        await Memoire.sauverApprentissage('carnet', carnet); toast('Retenu.', 'Oui chef !');
+      } }, 'Retenir ces notes') : null);
+  }
   async function fairePoint() {
+    if (S.pointClaude && S.pointClaude.enCours) return;
     const c = calculer();
-    const zone = $('#listeCarnet');
-    const bulle = h('div', { class: 'claude-bulle' }, 'Claude relit le carnet et la semaine…');
-    zone.prepend(bulle);
+    S.pointClaude = { enCours: true }; rendreSiVue('carnet');
     try {
       const semaines = (await Memoire.listerSemaines()).filter(s => s.pdf).slice(-8);
       const rep = await S.caps.sample.json(`Tu es le second du chef du Manoir de Procé. Fais le point sur ce que l'appli de commandes a appris et propose des améliorations concrètes.
 Semaines passées (services, retours) :
-${semaines.map(s => s.cle + ' : ' + (s.fiches || []).map(f => f.client + ' ' + (f.convives || '?') + 'p').join(', ') + (s.retour ? ' | retour : ' + Object.values(s.retour.lignes || {}).map(v => v.produit + ' ' + v.verdict).join(', ') + ' | ' + (s.retour.note || '') : '')).join('\n') || 'aucune'}
+${semaines.map(s => s.cle + ' : ' + servicesDe(s).join(', ') + (s.retour ? ' | retour : ' + Object.values(s.retour.lignes || {}).map(v => v.produit + ' ' + v.verdict).join(', ') + ' | ' + (s.retour.note || '') : '')).join('\n') || 'aucune'}
 Semaine en cours : ${c.evenements.map(e => e.fiche.client + ' ' + e.jour.date + ' ' + e.jour.convives + 'p').join(', ') || 'vide'}
 Pièces non modélisées cette semaine : ${c.commandes.nonModelises.map(n => n.code + ' ' + n.nom).join(', ') || 'aucune'}
 Quantités ajustées : ${Object.values(S.app.coefficients || {}).map(x => (x.produit || '') + ' ×' + x.coef).join(', ') || 'aucune'}
 Carnet :
 ${resumeCarnet(30)}
 Réponds uniquement en JSON : {"resume":"2 phrases","notes":["enseignement durable à garder"],"a_faire":["action concrète pour l'équipe, ex. compléter la fiche technique de P024"]}`, { modelTier: 'default', cache: false });
-      const notes = (rep.notes || []).map(String).slice(0, 5); const af = (rep.a_faire || []).map(String).slice(0, 6);
-      vider(bulle).append(h('strong', null, rep.resume || 'Le point de Claude'), notes.length ? h('ul', null, notes.map(n => h('li', null, n))) : null,
-        af.length ? h('div', null, h('div', { class: 'etape' }, 'À faire'), h('ul', null, af.map(n => h('li', null, n)))) : null,
-        notes.length ? h('button', { class: 'btn petit', type: 'button', onclick: async (e) => {
-          const carnet = { notes: ((S.app.carnet && S.app.carnet.notes) || []).concat(notes.map(t => ({ texte: t, le: new Date().toISOString(), source: 'point' }))).slice(-120) };
-          await Memoire.sauverApprentissage('carnet', carnet); e.currentTarget.disabled = true; toast('Retenu.', 'Oui chef !');
-        } }, 'Retenir ces notes') : null);
-    } catch (e) { bulle.textContent = messageErreurClaude(e); }
+      S.pointClaude = { resume: String((rep && rep.resume) || ''), notes: ((rep && rep.notes) || []).map(String).slice(0, 5), af: ((rep && rep.a_faire) || []).map(String).slice(0, 6) };
+    } catch (e) { S.pointClaude = { erreur: messageErreurClaude(e) }; }
+    rendreSiVue('carnet');
   }
 
   /* ------------------------------------------------------------------ *
    * Brigade
    * ------------------------------------------------------------------ */
   async function rendreBrigade() {
-    const zone = $('#listeBrigade'); vider(zone);
+    const g = ++S.genRendu;
     const ids = Object.keys(S.brigade).sort((a, b) => (S.brigade[b].points || 0) - (S.brigade[a].points || 0));
     let profils = {};
     if (S.caps.user && ids.length) { try { profils = await S.caps.user.profiles(ids) || {}; } catch (e) { profils = {}; } }
-    if (S.vue !== 'brigade') return;
+    if (g !== S.genRendu || S.vue !== 'brigade') return; // un rendu plus récent a pris la main
+    const zone = $('#listeBrigade'); vider(zone);
     const moiCle = Memoire.cleDoc(S.moi.id);
     const liste = h('div', { class: 'classement' });
     if (!ids.length) liste.appendChild(videVers('Personne n’a encore de toque.', 'Déposez une fiche pour gagner la première.', '#fiches', 'Aller aux fiches'));
@@ -1307,17 +1540,30 @@ Réponds uniquement en JSON : {"resume":"2 phrases","notes":["enseignement durab
   const VUES = ['fiches', 'menu', 'inventaire', 'bons', 'retour', 'fournisseurs', 'carnet', 'brigade'];
   function vueCourante() { const v = (location.hash || '').replace('#', ''); return VUES.indexOf(v) >= 0 ? v : 'fiches'; }
   function rendreSiVue(v) { if (S.vue === v) rendreDouce(); }
-  /** Rendu différé si quelqu'un est en train de saisir (pour ne pas lui voler le curseur). */
+  /**
+   * Rendu venu d'ailleurs (mémoire partagée, minuterie) : si quelqu'un saisit dans la page, on attend que le
+   * curseur quitte la page (focusout vers l'extérieur) ; un clic sur un bouton de la page n'est jamais perdu.
+   */
   function rendreDouce() {
     const a = document.activeElement;
-    if (a && a.closest && a.closest('#app, #fenetre') && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) {
-      if (!a.dataset.rendreApres) { a.dataset.rendreApres = '1'; a.addEventListener('blur', () => { delete a.dataset.rendreApres; setTimeout(rendre, 0); }, { once: true }); }
-      return;
-    }
+    if (a && a.closest && a.closest('#app, #fenetre') && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { S.renduEnAttente = true; return; }
     rendre();
   }
+  document.addEventListener('focusout', e => {
+    if (!S.renduEnAttente) return;
+    const vers = e.relatedTarget;
+    if (vers && vers.closest && vers.closest('#app, #fenetre')) return; // le curseur reste dans la page
+    setTimeout(() => { if (S.renduEnAttente) rendreDouce(); }, 0);
+  });
   function rendre() {
     if (!S.idx || !S.semaine) return;
+    S.renduEnAttente = false;
+    const focus = document.activeElement && document.activeElement.id; // remis en place après le rendu
+    rendreVue();
+    if (focus) { const el = document.getElementById(focus); if (el && el !== document.activeElement && el.closest('#app')) el.focus(); }
+  }
+  function rendreVue() {
+    if (S.lectureSeule && !$('#bandeauLecture')) $('#app').prepend(h('div', { id: 'bandeauLecture', class: 'claude-bulle', role: 'status' }, 'Lecture seule : vous voyez la semaine de l’équipe mais vos changements ne sont pas enregistrés. Demandez un accès Contributeur à la personne qui a partagé l’appli.'));
     S.vue = vueCourante();
     $$('.onglets a').forEach(a => { if (a.getAttribute('data-vue') === S.vue) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     $$('.vue').forEach(v => { v.hidden = v.getAttribute('data-vue') !== S.vue; });
@@ -1334,7 +1580,7 @@ Réponds uniquement en JSON : {"resume":"2 phrases","notes":["enseignement durab
     } catch (e) { console.error(e); toast('Affichage incomplet : ' + (e.message || e)); }
   }
   function allerSemaine(date) {
-    Memoire.enregistrer();
+    Memoire.vidanger(); // ce qui a changé sur l'ancienne semaine part avant d'ouvrir la nouvelle
     S.semaineDate = date; S.sem = M.semaineDe(date);
     lsSet('semaine', M.iso(S.sem.lundi));
     majSemaineLibelle();
@@ -1356,14 +1602,22 @@ Réponds uniquement en JSON : {"resume":"2 phrases","notes":["enseignement durab
     const auj = new Date();
     const defaut = M.ajouterJours(auj, auj.getDay() >= 4 || auj.getDay() === 0 ? 7 : 0);
     S.sem = M.semaineDe(memo || defaut);
-    await Memoire.init(null);
+    const dansClaude = !!(window.claude && typeof window.claude.use === 'function');
+    if (!dansClaude) await Memoire.init(null);
     allerSemaine(memo || defaut);
+    // dans Claude, on attend de savoir si la mémoire partagée répond avant d'autoriser la saisie
+    if (dansClaude) { S.chargement = true; rendre(); }
     majMoi();
     // capacités Claude : arrivent après le premier rendu
     initCapacites().then(async () => {
       if (S.caps.db) { await Memoire.init(S.caps.db); allerSemaine(S.semaineDate); }
+      else if (dansClaude) { await Memoire.init(null); S.chargement = false; allerSemaine(S.semaineDate); }
       majMoi(); rendre();
     });
+    // les heures limites vieillissent : on recalcule chaque minute et au retour sur l'onglet
+    const rafraichir = () => { if (document.visibilityState === 'visible') { S.calc = null; rendreDouce(); } };
+    setInterval(rafraichir, 60000);
+    document.addEventListener('visibilitychange', rafraichir);
   }
 
   /* ------------------------------------------------------------------ *
