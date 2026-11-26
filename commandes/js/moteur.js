@@ -187,14 +187,29 @@
     return cands[0];
   }
   /**
+   * Date de référence (option « reference » de lireDocument / datesDepuisTexte) : objet Date, chaîne ISO « AAAA-MM-JJ »
+   * (une date-heure ISO « AAAA-MM-JJTHH:MM… » est acceptée, seule la date compte) ou horodatage en millisecondes ; sinon null.
+   */
+  function dateReference(x) {
+    if (x == null || x === '') return null;
+    if (x instanceof Date) return isNaN(x.getTime()) ? null : x;
+    if (typeof x === 'number') { const d = new Date(x); return isFinite(x) && !isNaN(d.getTime()) ? d : null; }
+    return deIso(x);
+  }
+  // mots suivis d'un numéro qui n'est pas un jour (« Salle 2 », « Option 1 », « Table 4 ») : jamais le début d'une liste de dates
+  const NOMS_NUMERO = /^(?:salle|salles|salon|salons|option|options|table|tables|lot|lots|etage|niveau|groupe|groupes|formule|formules|menu|menus|n|no|num|numero|ref|reference|version|v|zone|espace|chambre|chambres|bus|car|atelier|ateliers|session|sessions|module|modules|jour|jours|tarif|prix|devis|lieu|batiment|bloc|porte|tranche|categorie|tente|stand|equipe|equipes)$/;
+  /**
    * Dates écrites en français dans un texte : « Vendredi 11 décembre 2026 », « 4 + 5 + 6 février 2027 »,
    * « 4, 5 et 6 février », « 4/5/6 février », « du 4 au 6 février », « mardi 1er et mercredi 2 décembre », « 03/12/2026 ».
-   * reference (Date ou ISO, facultative) : sert à deviner l'année quand elle manque.
+   * Une suite « N – M », « N, M », « N + M » n'est une liste (ou une plage) que si chaque nombre est un jour plausible et que
+   * l'ensemble est suivi du mois : « Salle 2 – samedi 12 décembre » = le 12 seulement (le jour de semaine n'accompagne que le 12),
+   * « Option 1 - 5 décembre » = le 5, « 2 – 12 décembre » = le 12 (une plage au tiret dépasse rarement une semaine).
+   * reference (facultative) : Date, chaîne ISO « AAAA-MM-JJ » ou horodatage ; sert à deviner l'année quand elle manque.
    */
   function datesDepuisTexte(texte, anneeParDefaut, reference) {
     // texte en minuscules sans accents, mais en gardant , / - + qui séparent les jours d'une liste
     const t = sansAccents(texte).toLowerCase().replace(/[’`´]/g, "'").replace(/\s+/g, ' ');
-    const ref = reference ? (reference instanceof Date ? reference : deIso(reference)) : null;
+    const ref = dateReference(reference);
     const res = [];
     const J = '(?:' + RE_NOM_JOUR + '\\.?\\s+)?';
     const N = '\\d{1,2}(?:er)?';
@@ -207,18 +222,39 @@
       const anneeEcrite = m[4] ? +m[4] : null;
       const annee = anneeEcrite || anneeParDefaut || (ref ? ref.getFullYear() : null);
       if (!annee) continue;
-      // lecture de la liste : nombres, séparateurs (une plage pour « au », « à », « - ») et jours de semaine
+      // éléments de la liste : nombre, jour de semaine écrit devant, séparateur qui le précède
       const reTok = new RegExp('(' + RE_NOM_JOUR + ')|(\\d{1,2})(?:er)?|(\\+|&|,|\\/|-|–|\\bet\\b|\\bau\\b|\\ba\\b)', 'g');
-      let k; let prec = null; let plage = false; let nomJour = null;
-      const jours = [];
+      let k; let sep = null; let nomJour = null;
+      const elems = [];
       while ((k = reTok.exec(m[2]))) {
         if (k[1]) { nomJour = k[1]; continue; }
-        if (k[3]) { plage = /^(au|a|-|–)$/.test(k[3]); continue; }
-        const j = +k[2];
-        if (j < 1 || j > 31) { prec = null; nomJour = null; continue; }
-        if (plage && prec != null && j > prec && j - prec <= 31) for (let x = prec + 1; x < j; x++) jours.push({ j: x, nomJour: null });
-        jours.push({ j, nomJour });
-        prec = j; plage = false; nomJour = null;
+        if (k[3]) { sep = k[3]; continue; }
+        elems.push({ j: +k[2], nomJour, sep });
+        sep = null; nomJour = null;
+      }
+      if (!elems.length) continue;
+      // on remonte depuis le nombre collé au mois tant que le lien avec le précédent est plausible
+      let debut = elems.length - 1;
+      if (elems[debut].j < 1 || elems[debut].j > 31) continue;
+      while (debut > 0) {
+        const cur = elems[debut]; const prec = elems[debut - 1];
+        if (prec.j < 1 || prec.j > 31 || prec.j >= cur.j) break;
+        if (cur.nomJour && !prec.nomJour) break; // « Salle 2 – samedi 12 »
+        const plage = /^(au|a|-|–)$/.test(cur.sep || '');
+        if (plage && cur.j - prec.j > (/^(au|a)$/.test(cur.sep) ? 14 : 6)) break;
+        if (!plage && cur.j - prec.j > 14) break;
+        debut--;
+      }
+      // « Option 1 - 5 décembre » : un numéro collé à un nom n'ouvre pas la liste
+      if (debut < elems.length - 1 && !elems[debut].nomJour) {
+        const avant = t.slice(0, m.index + m[1].length).trim().split(' ').pop() || '';
+        if (NOMS_NUMERO.test(avant.replace(/[^a-z]/g, ''))) debut++;
+      }
+      const jours = [];
+      for (let i = debut; i < elems.length; i++) {
+        const x = elems[i];
+        if (i > debut && /^(au|a|-|–)$/.test(x.sep || '')) for (let y = elems[i - 1].j + 1; y < x.j; y++) jours.push({ j: y, nomJour: null });
+        jours.push({ j: x.j, nomJour: x.nomJour });
       }
       jours.forEach(x => {
         const d = anneeEcrite ? dateValide(anneeEcrite, mois, x.j) : resoudreAnnee(x.j, mois, annee, x.nomJour, ref);
@@ -242,18 +278,58 @@
     const i = rows.findIndex(r => (r || []).some(c => norm(c).indexOf(motCle) === 0));
     return i < 0 ? 0 : i;
   }
-  /** Délai de commande en heures : « 48 h » / « 48h » → 48 ; « la veille avant 12h » → 24 ; « 1-2j » → 48 ; « 4-7 jours » → 168 ; « 10 jours » → 240. */
+  /**
+   * Heure limite fixe écrite dans un délai : « avant 14h pour le lendemain », « J-1 avant 12h », « la veille avant 12h »,
+   * « commande avant 10h la veille », « avant-veille 10h », « jusqu'à midi la veille » → { jours, heure, minutes }
+   * (commander au plus tard « jours » avant la livraison, à cette heure-là) ; null sans veille / lendemain / J-n ou sans heure.
+   */
+  function parseHeureLimite(s) {
+    const t = sansAccents(s).toLowerCase().replace(/[’`´]/g, "'").replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    let jours = null;
+    const mj = t.match(/\bj\s*-\s*(\d{1,2})\b/);
+    if (mj) jours = +mj[1];
+    else if (/avant[\s-]*veille/.test(t)) jours = 2;
+    else if (/\bveille\b|\blendemain\b|\bj\s*\+\s*1\b/.test(t)) jours = 1;
+    if (!(jours >= 1)) return null;
+    let heure = null; let minutes = 0;
+    // « 14h », « 14 h 30 », « 14:30 », « 14 heures » (le 1 de « J-1 » n'est pas une heure)
+    const mh = t.match(/(?:^|[^0-9a-z+-])(\d{1,2})\s*(?:h(?![a-z])|heures?\b|:(?=\d{2}))\s*(\d{2})?/);
+    if (mh && +mh[1] <= 23) { heure = +mh[1]; minutes = mh[2] ? Math.min(59, +mh[2]) : 0; }
+    else if (/\bmidi\b/.test(t)) heure = 12;
+    if (heure == null) return null;
+    return { jours, heure, minutes };
+  }
+  /** Délai de commande en heures : « 48 h » / « 48h » → 48 ; « la veille avant 12h » → 24 ; « J-2 » → 48 ; « 1-2j » → 48 ; « 4-7 jours » → 168 ; « 10 jours » → 240. */
   function parseDelai(s) {
     const t = norm(s); if (!t) return null;
-    // « la veille avant 12 h » : le nombre est une heure de la journée, pas un délai
+    // « la veille avant 12 h », « avant 14h pour le lendemain », « J-1 avant 12h » : le nombre est une heure de la journée,
+    // le délai est d'un jour (l'heure exacte est lue par parseHeureLimite)
+    const hl = parseHeureLimite(s);
+    if (hl) return hl.jours * 24;
     if (/avant veille/.test(t)) return 48;
-    if (/\bveille\b/.test(t)) return 24;
+    if (/\bveille\b|\blendemain\b/.test(t)) return 24;
+    const mj = t.match(/\bj (\d{1,2})\b/); // « J-2 » (norm : « j 2 »)
+    if (mj && +mj[1] >= 1) return +mj[1] * 24;
     const nums = (t.match(/\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(',', '.')));
     if (!nums.length) return null;
     const n = Math.max.apply(null, nums);
     if (/\d\s*h(?![a-z])|heure/.test(t)) return n; // « 48h » n'a pas de frontière de mot entre 8 et h
     if (/semaine/.test(t)) return n * 168;
     return n * 24; // jours par défaut
+  }
+  /**
+   * Heure limite fixe d'un fournisseur, lue dans « délai » (« avant 14h pour le lendemain ») ou « heure limite »
+   * (« la veille avant 12h ») : { jours, heure, minutes, seule } ; seule = le délai en heures vient du même texte (ou manque),
+   * l'heure fixe fait alors foi ; sinon on retient la plus tôt des deux limites.
+   */
+  function limiteCommandeDe(f) {
+    if (!f) return null;
+    const d = parseHeureLimite(f.delai);
+    if (d) return Object.assign(d, { seule: true });
+    const h = parseHeureLimite(f.heureLimite);
+    if (h) return Object.assign(h, { seule: parseDelai(f.delai) == null });
+    return null;
   }
   const ABR_JOURS = { lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6, dim: 0 };
   const RE_JOUR_LIVR = '(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|mar|mer|jeu|ven|sam|dim)\\.?';
@@ -317,7 +393,7 @@
     });
     return Object.values(parSlug).map(f => Object.assign(f, {
       delaiHeures: parseDelai(f.delai), joursLivraison: parseJours(f.jours), conditionnementParse: parseConditionnement(f.conditionnement),
-      minimumParse: parseConditionnement(f.minimum),
+      minimumParse: parseConditionnement(f.minimum), limiteCommande: limiteCommandeDe(f),
     }));
   }
   function parseFrequence(s) {
@@ -427,7 +503,10 @@
     completer(con && con.fournisseursInfos, 'con');
     completer(app.fournisseurs, 'app');
     Object.values(fournisseurs).forEach(f => {
+      f.limiteCommande = limiteCommandeDe(f);
       f.delaiHeures = parseDelai(f.delai);
+      // délai vide mais heure limite connue (« la veille avant 12h ») : le délai en jours s'en déduit
+      if (f.delaiHeures == null && f.limiteCommande) f.delaiHeures = f.limiteCommande.jours * 24;
       f.joursLivraison = parseJours(f.jours);
       f.conditionnementParse = parseConditionnement(f.conditionnement);
       f.minimumParse = parseConditionnement(f.minimum);
@@ -485,7 +564,9 @@
   // mot-clé nié (« pas de petits déjeuners ») ou simple contexte (« pendant le déjeuner ») : pas une prestation
   // la négation porte sur le mot-clé qui la suit (au plus un mot entre les deux), dans le même membre de phrase :
   // on coupe à la ponctuation (, ; · ( ) / + et « - » entre espaces), voir normAvecMembres()
-  const NEGATIONS = /(?:^|\s)(pas de|pas d|sans|hors|aucun|aucune|non compris|non inclus|ni|pendant le|pendant la|pendant les|lors du|lors de|lors des|avant le|avant la|apres le|apres la|au cours du|durant le|durant la|au moment du|remplace le|remplace la|remplace les|remplacer le|remplacer la|remplacer les|a la place du|a la place de|a la place des|a la place d|en remplacement du|en remplacement de|en remplacement des|au lieu du|au lieu de|au lieu des|au lieu d|servi avec|servis avec|servie avec|servies avec)\s+(?:\S+\s+){0,1}$/;
+  // « servi avec un verre de vin », « servi avec café » ne sont PAS des négations : ce qui est servi avec le plat est inclus ;
+  // seul « servi avec le / la / les … » renvoie à une autre prestation (« verres de vin servis avec le cocktail déjeunatoire »)
+  const NEGATIONS = /(?:^|\s)(pas de|pas d|sans|hors|aucun|aucune|non compris|non inclus|ni|pendant le|pendant la|pendant les|lors du|lors de|lors des|avant le|avant la|apres le|apres la|au cours du|durant le|durant la|au moment du|remplace le|remplace la|remplace les|remplacer le|remplacer la|remplacer les|a la place du|a la place de|a la place des|a la place d|en remplacement du|en remplacement de|en remplacement des|au lieu du|au lieu de|au lieu des|au lieu d|servie?s? avec (?:le|la|les|l))\s+(?:\S+\s+){0,1}$/;
   /**
    * Texte normalisé (comme norm) + pour chaque position, le début du membre de phrase qui la contient :
    * norm() efface la ponctuation, on la relit sur le texte brut pour ne pas étendre une négation au-delà d'une virgule.
@@ -737,7 +818,16 @@
   /** Découpe une fiche de fonction (FF) : lignes « 15 cocktails… », « 31 menus du mois… » dans RESTAURATION / BOISSONS. */
   function prestationsFiche(lignes, idx) {
     const items = []; const remarques = []; let section = ''; let nouvelleSection = false;
+    const formulesCuisine = texte => detecterForfaits(texte, idx).filter(x => idx.forfaits[x.id] && !idx.forfaits[x.id].horsCuisine).map(x => x.id);
+    const texteItem = it => [it.libelle].concat(it.details || []).join(' · ');
     const nouvelItem = (l, quantite) => {
+      // un titre-formule en capitales (« COCKTAIL ») suivi directement de la ligne chiffrée de la même formule
+      // (« 40 cocktails dînatoires ») n'était qu'un titre : la ligne chiffrée le remplace
+      const prec = items[items.length - 1];
+      if (prec && prec.titreFormule && !prec.details.length && quantite != null) {
+        const seule = formulesCuisine(l);
+        if (formulesCuisine(l + ' · ' + prec.libelle).every(id => seule.indexOf(id) >= 0)) items.pop();
+      }
       const it = { libelle: l, details: [], quantite };
       const codes = RE_LIGNE_NEGATIVE.test(norm(l)) ? [] : codesCatalogueDepuisTexte(l, idx);
       if (codes.length) it.choisis = codes.map(code => ({ code, texte: l }));
@@ -752,10 +842,28 @@
         // un titre court en majuscules fait sortir du déroulé (« MENU » puis « 60 menus du mois ») ;
         // dans la restauration, un sous-titre (« SALÉ », « FROMAGES ») y reste, sauf titre clairement hors cuisine
         const resto = /menu|repas|cocktail|buffet|brunch|dejeuner|diner|pause|boisson|bar\b|dessert|aperitif|apero|restauration|traiteur|fromage|planche|vin\b|vins\b/.test(n);
-        if (resto) section = 'resto';
-        else if (section !== 'resto' || RE_TITRES_HORS_RESTO.test(n)) section = 'autre';
-        nouvelleSection = true;
-        return;
+        const horsResto = RE_TITRES_HORS_RESTO.test(n);
+        let ordinaire = false;
+        if (!horsResto && (resto || section === 'resto')) {
+          // une ligne en capitales peut être une formule (« COCKTAIL DÎNATOIRE PROCÉ », « BRUNCH ») : elle ouvre une prestation
+          // si elle ajoute une formule à la prestation en cours (« PIÈCES SALÉES » sous un cocktail reste un sous-titre)
+          const dernier = section === 'resto' ? items[items.length - 1] : null;
+          const avant = dernier ? formulesCuisine(texteItem(dernier)) : [];
+          const apres = formulesCuisine(dernier ? texteItem(dernier) + ' · ' + l : l);
+          if (apres.some(id => avant.indexOf(id) < 0)) {
+            section = 'resto';
+            nouvelItem(l, null).titreFormule = true;
+            return;
+          }
+          // ou une pièce choisie (« CREVETTE CROUSTILLANTE ») : ligne ordinaire de la restauration
+          if (section === 'resto' && codeCatalogueDepuisTexte(l, idx)) ordinaire = true;
+        }
+        if (!ordinaire) {
+          if (resto) section = 'resto';
+          else if (section !== 'resto' || horsResto) section = 'autre';
+          nouvelleSection = true;
+          return;
+        }
       }
       const sous = n.match(/^(\d+(?:[.,]\d+)?)\s+(pieces?|verrines?|bouchees?)\b/);
       if (sous && items.length && section !== 'deroule') {
@@ -802,8 +910,13 @@
           return;
         }
         // ligne sans quantité : nouvelle prestation (convives du jour) si rien n'est encore ouvert, ou en tête d'une nouvelle
-        // section quand elle déclenche une formule (« BOISSONS / Forfait boissons 3 verres »)
-        const formule = () => detecterForfaits(l, idx).some(x => idx.forfaits[x.id] && !idx.forfaits[x.id].horsCuisine);
+        // section quand elle ajoute une formule à la prestation en cours (« BOISSONS / Forfait boissons 3 verres ») ;
+        // « PIÈCES SUCRÉES / Mignardises Honoré » sous un cocktail qui les comprend déjà reste un détail du cocktail
+        const formule = () => {
+          if (!dernier) return formulesCuisine(l).length > 0;
+          const avant = formulesCuisine(texteItem(dernier));
+          return formulesCuisine(texteItem(dernier) + ' · ' + l).some(id => avant.indexOf(id) < 0);
+        };
         if (!dernier || (nouvelleSection && formule())) {
           if (!dernier && !formule() && /allerg|vegetarien|vegan|sans gluten|halal|regime/.test(n)) { remarques.push(l); return; }
           nouvelItem(l, null);
@@ -867,6 +980,8 @@
   /**
    * Lit un document (texte brut extrait d'un PDF, d'un Word ou du Drive) et retourne une « fiche » :
    * { id, nomFichier, type, client, horaires, convives, dates[], jours:[{date, convives, prestations:[…]}], regimes, remarques[], lecture:'locale' }
+   * options : { annee?: number (année par défaut), reference?: Date | 'AAAA-MM-JJ' | horodatage (ms) — date de la semaine
+   * affichée, pour deviner l'année d'une date écrite sans année ; à défaut la date du nom de fichier, sinon aujourd'hui }.
    */
   function lireDocument(texte, nomFichier, idx, options) {
     options = options || {};
@@ -876,7 +991,8 @@
     const anneeRef = dates.length ? +dates[0].slice(0, 4) : (options.annee || new Date().getFullYear());
     // date de référence pour une année absente (« Vendredi 1er janvier ») : options.reference (semaine affichée) si l'appli
     // la donne, sinon la date du nom de fichier, sinon aujourd'hui quand l'année demandée est proche
-    let reference = options.reference ? (options.reference instanceof Date ? options.reference : deIso(options.reference)) : (dates.length ? deIso(dates[0]) : null);
+    // (Date, chaîne ISO « AAAA-MM-JJ » ou horodatage, voir dateReference)
+    let reference = dateReference(options.reference) || (dates.length ? deIso(dates[0]) : null);
     if (!reference) { const auj = new Date(); if (Math.abs(auj.getFullYear() - anneeRef) <= 1) reference = auj; }
     const enTete = lignes.slice(0, 30).join('\n');
     // dates administratives du devis (émission, validité, échéance) : jamais la date de l'événement
@@ -960,7 +1076,11 @@
     return fiche;
   }
 
-  /** Normalise la réponse JSON de Claude (même forme que lireDocument) en restant tolérant. */
+  /**
+   * Normalise la réponse JSON de Claude (même forme que lireDocument) en restant tolérant.
+   * Champ facultatif « exclus » (tableau de codes du catalogue refusés par le client : « Pas de nem de cochon » → ["P007"]),
+   * accepté sur la réponse, sur un jour ou sur une prestation ; les exclus de la lecture locale (base) sont toujours gardés.
+   */
   function normaliserLectureClaude(rep, base, idx) {
     if (!rep || typeof rep !== 'object') return base;
     const fiche = Object.assign({}, base, { lecture: 'claude' });
@@ -972,6 +1092,13 @@
     else if (rep.regimes) fiche.regimes = [String(rep.regimes)];
     if (Array.isArray(rep.points_attention)) fiche.remarques = rep.points_attention.map(String).slice(0, 10);
     const jours = Array.isArray(rep.jours) ? rep.jours : [];
+    // pièces refusées par le client (« Pas de nem de cochon ») : celles de la lecture locale (toute la fiche) sont gardées,
+    // plus le champ « exclus » de Claude (codes du catalogue, ou objets { code }) au niveau de la fiche, du jour ou de la prestation
+    const codesExclus = v => (Array.isArray(v) ? v : (v ? [v] : [])).map(c => String(c && typeof c === 'object' ? c.code : c || '').trim().toUpperCase()).filter(c => idx.catalogue[c]);
+    const exclusBase = [];
+    (base && base.jours || []).forEach(j => (j.prestations || []).forEach(p => (p.exclus || []).forEach(c => { if (exclusBase.indexOf(c) < 0) exclusBase.push(c); })));
+    const exclusFiche = exclusBase.concat(codesExclus(rep.exclus));
+    const union = (a, b) => a.concat(b).filter((c, i, t) => t.indexOf(c) === i);
     if (jours.length) {
       fiche.jours = jours.filter(j => deIso(j.date)).map((j, ji) => ({
         date: iso(deIso(j.date)),
@@ -984,6 +1111,7 @@
             quantite: +p.quantite > 0 ? +p.quantite : null, date: iso(deIso(j.date)), forfaits: ids,
             confiance: typeof p.confiance === 'number' ? p.confiance : (ids.length ? 0.8 : 0), via: 'claude',
             choisis: (Array.isArray(p.choix) ? p.choix : []).filter(c => c && idx.catalogue[c.code]).map(c => ({ code: c.code, parConvive: +c.nombre_par_convive || null })),
+            exclus: union(union(exclusFiche, codesExclus(j.exclus)), codesExclus(p.exclus)),
             // le gabarit du prompt contient {viande:0,poisson:0,vegetarien:0} : une répartition nulle n'en est pas une
             repartition: repartitionValide(p.repartition),
             nbParConvive: +p.nombre_par_convive > 0 ? +p.nombre_par_convive : null,
@@ -994,6 +1122,11 @@
       fiche.dates = fiche.jours.map(j => j.date);
       const c = fiche.jours.map(j => j.convives).filter(Boolean);
       if (c.length) fiche.convives = Math.max.apply(null, c);
+    } else if (codesExclus(rep.exclus).length) {
+      // pas de jours dans la réponse : la lecture locale reste, avec les refus lus par Claude
+      fiche.jours = (base.jours || []).map(j => Object.assign({}, j, {
+        prestations: (j.prestations || []).map(p => Object.assign({}, p, { exclus: union(p.exclus || [], codesExclus(rep.exclus)) })),
+      }));
     }
     return fiche;
   }
@@ -1422,14 +1555,25 @@
     if (!jours && d.getDay() === 0) d = ajouterJours(d, -1); // pas de livraison le dimanche par défaut
     return iso(d);
   }
-  /** Heure limite de commande = livraison (8 h) − délai ; en l'absence de délai, 48 h par défaut (signalé). */
+  /**
+   * Heure limite de commande = livraison (8 h) − délai ; en l'absence de délai, 48 h par défaut (signalé).
+   * Heure fixe (« avant 14h pour le lendemain », « J-1 avant 12h ») : la veille (ou J-n) à cette heure, jamais plus tard ;
+   * si le fournisseur donne aussi un délai en heures dans un autre champ, la plus tôt des deux limites.
+   */
   function heureLimite(livraisonIso, f, maintenant) {
     const d = deIso(livraisonIso); d.setHours(8, 0, 0, 0);
     const delai = f && f.delaiHeures != null ? f.delaiHeures : 48;
     // calcul en jours de calendrier puis en heures : 8 h − 48 h reste 8 h, même au passage à l'heure d'été
-    const limite = new Date(d.getTime());
+    let limite = new Date(d.getTime());
     limite.setDate(limite.getDate() - Math.floor(delai / 24));
     limite.setMinutes(limite.getMinutes() - Math.round((delai % 24) * 60));
+    const hf = f ? (f.limiteCommande !== undefined ? f.limiteCommande : limiteCommandeDe(f)) : null;
+    if (hf) {
+      const fixe = deIso(livraisonIso);
+      fixe.setDate(fixe.getDate() - hf.jours);
+      fixe.setHours(hf.heure, hf.minutes || 0, 0, 0);
+      if (hf.seule || fixe < limite) limite = fixe;
+    }
     // une commande se passe en journée : la nuit (avant 8 h) on ramène à 17 h la veille, le soir (après 17 h) à 17 h
     if (limite.getHours() < 8) { limite.setDate(limite.getDate() - 1); limite.setHours(17, 0, 0, 0); }
     else if (limite.getHours() > 17 || (limite.getHours() === 17 && limite.getMinutes() > 0)) limite.setHours(17, 0, 0, 0);
@@ -1439,20 +1583,59 @@
       const h = (limite - maintenant) / 3600e3;
       urgence = h < 0 ? 'retard' : h < 24 ? 'aujourdhui' : h < 72 ? 'bientot' : 'ok';
     }
-    return { limite, delaiConnu: !!(f && f.delaiHeures != null), urgence };
+    return { limite, delaiConnu: !!(f && (f.delaiHeures != null || hf)), heureFixe: !!hf, urgence };
+  }
+  /**
+   * Prochaine livraison dont l'heure limite n'est pas encore passée, à partir de la date voulue (ou d'aujourd'hui si elle
+   * est déjà passée) : sert aux produits de fond, que la réserve couvre en attendant.
+   */
+  function prochaineLivraisonPossible(dateIso, f, maintenant) {
+    const auj = iso(maintenant);
+    let d = deIso(dateIso > auj ? dateIso : auj);
+    const jours = f && f.joursLivraison;
+    for (let k = 0; k < 31; k++, d = ajouterJours(d, 1)) {
+      if (jours && jours.length ? jours.indexOf(d.getDay()) < 0 : d.getDay() === 0) continue;
+      if (heureLimite(iso(d), f, maintenant).limite >= maintenant) return iso(d);
+    }
+    return null;
   }
   /**
    * besoins + stock → bons de commande par fournisseur.
    * stock : { [cleSansDate]: qteEnBase }  (clé fournisseur::produit::base, saisie dans l'inventaire express)
+   *
+   * Produits de fond (café, thé, chocolat, jus en BIB, sirop : ligne.fond) : ils vivent sur la réserve de la maison.
+   *  - une seule ligne par produit et par fournisseur pour la semaine, à la livraison de fond la plus tôt ; si son heure limite
+   *    est déjà passée, à la prochaine livraison encore possible (livraison.reportee = true) : la réserve couvre en attendant ;
+   *  - besoin brut de la semaine affiché (besoin) ; un conditionnement entier (seau, BIB, bouteille) n'est proposé que si le
+   *    besoin atteint la moitié d'un conditionnement ; sinon aCommander = 0, reserve = true, aPrendreSurReserve = besoin restant
+   *    (et une alerte « à prendre sur la réserve ») ; conditionnement inconnu (sachets, grammes sans colis) : besoin brut proposé ;
+   *  - jamais « retard » : une livraison qui ne porte que du fond reste « ok » et n'entre pas dans prochaineLimite.
    */
   function calculerCommandes(besoins, idx, stock, options) {
     options = options || {};
     stock = stock || {};
+    const maintenant = options.maintenant || new Date();
     const restant = {}; Object.keys(stock).forEach(k => { restant[k] = +stock[k] || 0; });
     const parF = {};
-    // fournisseurs à long délai (≥ 3 jours) : une seule livraison, la plus tôt de la semaine
-    const plusTot = {};
-    besoins.lignes.forEach(l => { if (l.type !== 'maison' && (!plusTot[l.fournisseurSlug] || l.dateBesoin < plusTot[l.fournisseurSlug])) plusTot[l.fournisseurSlug] = l.dateBesoin; });
+    // fournisseurs à long délai (≥ 3 jours) : une seule livraison, la plus tôt de la semaine ; produits de fond : une seule
+    // livraison de fond, la plus tôt de la semaine
+    const plusTot = {}; const plusTotFond = {};
+    besoins.lignes.forEach(l => {
+      if (l.type === 'maison') return;
+      if (!plusTot[l.fournisseurSlug] || l.dateBesoin < plusTot[l.fournisseurSlug]) plusTot[l.fournisseurSlug] = l.dateBesoin;
+      if (l.fond && (!plusTotFond[l.fournisseurSlug] || l.dateBesoin < plusTotFond[l.fournisseurSlug])) plusTotFond[l.fournisseurSlug] = l.dateBesoin;
+    });
+    const dateFond = {};
+    const livraisonFond = (fSlug, f, regroupe) => {
+      if (dateFond[fSlug]) return dateFond[fSlug];
+      let date = jourLivraison(regroupe ? plusTot[fSlug] : plusTotFond[fSlug], f);
+      let reportee = false;
+      if (heureLimite(date, f, maintenant).limite < maintenant) {
+        const p = prochaineLivraisonPossible(date, f, maintenant);
+        if (p && p !== date) { date = p; reportee = true; }
+      }
+      return (dateFond[fSlug] = { date, reportee });
+    };
     // 1er passage : regroupe par fournisseur, livraison et produit (on additionne avant d'arrondir)
     besoins.lignes.forEach(l => {
       if (l.type === 'maison') return;
@@ -1461,13 +1644,15 @@
       const bon = parF[l.fournisseurSlug] || (parF[l.fournisseurSlug] = {
         slug: l.fournisseurSlug, nom: l.fournisseur, infos: f, livraisons: {}, alertes: [], estimation: 0, prixConnus: 0, lignes: 0,
       });
-      const livraison = jourLivraison(regroupe ? plusTot[l.fournisseurSlug] : l.dateBesoin, f);
+      const lf = l.fond ? livraisonFond(l.fournisseurSlug, f, regroupe) : null;
+      const livraison = lf ? lf.date : jourLivraison(regroupe ? plusTot[l.fournisseurSlug] : l.dateBesoin, f);
       const liv = bon.livraisons[livraison] || (bon.livraisons[livraison] = { date: livraison, lignes: [] });
       const cleStock = cleProduit(l.fournisseurSlug, l.produit, l.base);
       let x = liv.lignes.find(y => y.cleStock === cleStock);
       if (!x) {
         x = { cle: l.cle, cleStock, produit: l.produit, produitSlug: l.produitSlug, base: l.base, besoin: 0, besoinBrut: 0, coef: l.coef, pour: [], type: l.type,
           verres: l.verres != null ? 0 : null, verresParBouteille: l.verresParBouteille || null, vpbDefaut: l.vpbDefaut, fond: !!l.fond };
+        if (lf && lf.reportee) x.reportee = true;
         liv.lignes.push(x);
       }
       x.besoin += l.qte; x.besoinBrut += l.qteBrute; x.pour = x.pour.concat(l.pour);
@@ -1489,11 +1674,20 @@
         // « Carton de 12 x 33 cl » pour une ligne en bouteilles : 12 bouteilles par carton
         else if (cp && cp.nombre && x.base !== 'g' && x.base !== 'ml') cond = { qte: cp.nombre, base: x.base, famille: 'compte:' + x.base, libelle: cp.libelle };
         if (!cond && f && f.conditionnementParse && f.conditionnementParse.base === x.base) cond = f.conditionnementParse;
-        // produit de fond (café, thé, jus en BIB) : au conditionnement entier, à défaut le minimum de commande (« seau 8kg »)
-        if (!cond && x.fond && f && f.minimumParse && f.minimumParse.base === x.base) cond = f.minimumParse;
+        let reserve = false; let aPrendreSurReserve = 0; let seuilReserve = null;
+        if (x.fond) {
+          // produit de fond : conditionnement = colis connu, à défaut le minimum de commande (« seau 8kg »), à défaut le
+          // contenant lui-même (BIB 5 L, bouteille 70 cl) ; moins d'un demi-conditionnement → à prendre sur la réserve
+          if (!cond && f && f.minimumParse && f.minimumParse.base === x.base) cond = f.minimumParse;
+          const pack = cond || (x.verresParBouteille ? { qte: 1, base: x.base, libelle: x.base } : null);
+          if (pack && pack.qte > 0) {
+            seuilReserve = pack.qte / 2;
+            if (aCommander > 0 && aCommander < seuilReserve) { reserve = true; aPrendreSurReserve = aCommander; aCommander = 0; }
+          }
+        }
         let colis = null;
         if (cond && cond.qte > 0 && aCommander > 0) { colis = Math.ceil(aCommander / cond.qte - 1e-9); aCommander = colis * cond.qte; }
-        else if (x.base !== 'g' && x.base !== 'ml') aCommander = Math.ceil(aCommander - 1e-9);
+        else if (x.base !== 'g' && x.base !== 'ml') aCommander = aCommander > 0 ? Math.ceil(aCommander - 1e-9) : 0;
         let cout = null;
         if (prix && prix.prix != null && aCommander > 0) {
           const pu = unite(prix.unite || x.base);
@@ -1503,15 +1697,17 @@
         if (cout != null) { bon.estimation += cout; bon.prixConnus++; }
         bon.lignes++;
         Object.assign(x, { stock: utilise, aCommander, colis, conditionnement: cond ? cond.libelle : '', cout });
+        if (x.fond) Object.assign(x, { reserve, aPrendreSurReserve, seuilReserve, conditionnementInconnu: seuilReserve == null });
       }));
     });
-    const maintenant = options.maintenant || new Date();
     const bons = Object.values(parF).map(b => {
       b.livraisons = Object.values(b.livraisons).sort((x, y) => x.date.localeCompare(y.date)).map(liv => {
         const hl = heureLimite(liv.date, b.infos, maintenant);
         // produits de fond seuls (café, thé, jus en BIB) : réserve à vérifier, pas une urgence liée aux événements
         const fond = liv.lignes.length > 0 && liv.lignes.every(x => x.fond);
-        return Object.assign(liv, { limite: hl.limite, delaiConnu: hl.delaiConnu, urgence: fond ? 'ok' : hl.urgence, fond, total: liv.lignes.filter(x => x.aCommander > 0).length });
+        const urgence = fond ? 'ok' : hl.urgence;
+        return Object.assign(liv, { limite: hl.limite, delaiConnu: hl.delaiConnu, heureFixe: hl.heureFixe, urgence, fond,
+          reportee: liv.lignes.some(x => x.reportee), total: liv.lignes.filter(x => x.aCommander > 0).length });
       });
       const f = b.infos;
       if (!f) b.alertes.push('Fournisseur absent de l’onglet Fournisseurs du classeur.');
@@ -1525,8 +1721,17 @@
           });
         }
       }
-      if (b.livraisons.some(l => l.lignes.some(x => x.fond && x.aCommander > 0))) {
-        b.alertes.push('Produits de fond (café, thé, jus…) : vérifier la réserve avant de commander ; ils se recommandent au conditionnement entier, sans urgence liée aux événements.');
+      const lignesFond = [].concat.apply([], b.livraisons.map(l => l.lignes.filter(x => x.fond)));
+      lignesFond.filter(x => x.reserve).forEach(x => {
+        b.alertes.push(x.produit + ' : ' + formatQte(x.aPrendreSurReserve, x.base) + ' à prendre sur la réserve (moins d’un demi-conditionnement'
+          + (x.conditionnement ? ' « ' + x.conditionnement + ' »' : '') + ') : rien à commander si la réserve suffit.');
+      });
+      if (lignesFond.length) {
+        b.alertes.push('Produits de fond (café, thé, jus…) : besoin de la semaine regroupé sur une ligne ; vérifier la réserve avant de commander'
+          + (lignesFond.some(x => x.aCommander > 0) ? ' (conditionnement entier proposé dès un demi-conditionnement de besoin).' : '.'));
+      }
+      if (b.livraisons.some(l => l.fond && l.reportee && l.total > 0)) {
+        b.alertes.push('Produits de fond : l’heure limite de la première livraison utile est passée ; réassort à la prochaine livraison possible, la réserve couvre en attendant.');
       }
       b.prochaineLimite = b.livraisons.filter(l => !l.fond).reduce((m, l) => (!m || l.limite < m ? l.limite : m), null);
       b.urgence = b.livraisons.reduce((u, l) => ['retard', 'aujourdhui', 'bientot', 'ok'].indexOf(l.urgence) < ['retard', 'aujourdhui', 'bientot', 'ok'].indexOf(u) ? l.urgence : u, 'ok');
@@ -1567,7 +1772,7 @@
     norm, slug, sansAccents, parseNombre, parseMontant, arrondi, unite, formatQte,
     iso, deIso, ajouterJours, semaineDe, dansSemaine, jourCourt, jourLong, datesDepuisCodes, datesDepuisTexte,
     // référentiel
-    parseReferentiel, parseDelai, parseJours, parseConditionnement, indexer, trouverFournisseur,
+    parseReferentiel, parseDelai, parseHeureLimite, parseJours, parseConditionnement, indexer, trouverFournisseur,
     // lecture
     lireDocument, normaliserLectureClaude, detecterForfaits, cleAlias, typeDocument, codeCatalogueDepuisTexte,
     convivesDepuisTexte, repartitionDepuisTexte, clientDepuisNomFichier,

@@ -631,12 +631,25 @@ test('cuisine-produits-de-fond-traites-a-levenement : café et jus en réserve, 
   assert.ok(fourche.alertes.some(a => /réserve/.test(a)));
   const cime = cmd.bons.find(b => b.slug === 'cime');
   const cafe = cime.livraisons[0].lignes[0];
-  assert.strictEqual(cafe.colis, 1, 'au seau entier');
-  assert.strictEqual(cafe.aCommander, 8000);
+  // ~330 g de café pour 30 : moins d'un demi-seau de 8 kg → à prendre sur la réserve, rien à commander (pas un seau entier)
+  assert.ok(cafe.fond && cafe.reserve, 'à prendre sur la réserve');
+  assert.strictEqual(cafe.aCommander, 0);
+  assert.strictEqual(cafe.colis, null);
+  proche(cafe.aPrendreSurReserve, cafe.besoin, 'besoin brut montré');
+  assert.ok(cime.alertes.some(a => /à prendre sur la réserve/.test(a)));
   assert.ok(!cime.alertes.some(a => /minimum/.test(a)));
-  // le stock saisi est déduit comme pour les autres produits
-  const stock = {}; stock[cafe.cleStock] = 5000;
-  assert.strictEqual(M.calculerCommandes(besoinsDe(f, {}), idx, stock, {}).bons.find(b => b.slug === 'cime').livraisons[0].lignes[0].aCommander, 0);
+  // la limite affichée n'est jamais déjà passée : la réserve couvre, le réassort part à la prochaine livraison possible
+  assert.ok(cime.livraisons[0].limite >= new Date(2026, 10, 26, 10));
+  // 500 convives : plus d'un demi-seau → un seau entier ; le stock saisi est déduit comme pour les autres produits
+  const g = lire('CLIENT\nDate : Lundi 30 novembre 2026 Nombre : 500 personnes\nLibellé Qté PU HT Montant HT TVA\nForfait journée de travail 500,00 50,00 € 25000,00 € 20,00%\nTotal HT', 'Devis G.pdf');
+  const gros = M.calculerCommandes(besoinsDe(g, {}), idx, {}, { maintenant: new Date(2026, 10, 26, 10) }).bons.find(b => b.slug === 'cime').livraisons[0].lignes[0];
+  assert.strictEqual(gros.colis, 1, 'au seau entier');
+  assert.strictEqual(gros.aCommander, 8000);
+  const stock = {}; stock[gros.cleStock] = 2000;
+  const apresStock = M.calculerCommandes(besoinsDe(g, {}), idx, stock, { maintenant: new Date(2026, 10, 26, 10) }).bons.find(b => b.slug === 'cime').livraisons[0].lignes[0];
+  assert.strictEqual(apresStock.stock, 2000);
+  assert.strictEqual(apresStock.aCommander, 0, 'reste moins d’un demi-seau : réserve');
+  assert.ok(apresStock.reserve);
   // un bon sans date limite passe après ceux qui en ont une
   assert.ok(cmd.bons.findIndex(b => b.slug === 'la-fourche') > cmd.bons.findIndex(b => b.prochaineLimite));
 });
@@ -707,4 +720,165 @@ test('journée de travail : le cocktail déjeunatoire remplace le déjeuner assi
   const soir = postesDe(devis(['Forfait journée de travail + cocktail dînatoire le soir 20,00 70,00 € 1400,00 € 20,00%'], 20));
   assert.ok(soir.some(p => p.famille === 'plat'));
   assert.strictEqual(soir.find(p => p.ref && p.ref.code === 'P051' && p.forfait === 'cocktail_proce').parConvive, 4);
+});
+
+/* ------------------------------------------------------------------ *
+ * Second tour : régressions R1…R10 et corrections partielles
+ * ------------------------------------------------------------------ */
+test('R1 : « menu » seul n’est pas un repas assis (menu enfant, menu ci-joint, « Menu : » d’un cocktail)', () => {
+  assert.deepStrictEqual(ids('11 menus enfant x 12€ - Dont un menu sans gluten · Poulet pané maison, grenailles + 1 glace + 1 jus de pomme BIO ou sirop'), ['menu_enfant']);
+  assert.deepStrictEqual(ids('Menu enfant · 1 menu végétarien'), ['menu_enfant']);
+  assert.deepStrictEqual(ids('Brunch (menu ci-joint)'), ['brunch']);
+  assert.deepStrictEqual(ids('Menu cocktail : 11 pièces salées + 4 mignardises'), ['cocktail_proce']);
+  assert.deepStrictEqual(ids('Menu végétarien'), []);
+  // un menu qui cite ses plats reste un repas assis
+  assert.deepStrictEqual(ids('44 menus x 25€ · Entrée : Œuf mollet mariné | Plat : Pastilla de volaille | Dessert : Crémet nantais'), ['dejeuner_menu_chef']);
+  assert.deepStrictEqual(ids('Menu du jour'), ['dejeuner_menu_chef']);
+  const f = devis(['Menu Procé 40,00 35,00 € 1 400,00 € 10,00%', 'Menus enfant - Dont un menu sans gluten 11,00 12,00 € 132,00 € 10,00%'], 51);
+  const plats = postesDe(f).filter(p => p.famille === 'plat');
+  assert.deepStrictEqual(plats.map(p => p.forfait + ':' + p.convives), ['menu_proce:40']);
+  const c = postesDe(fiche(['RESTAURATION', '40 cocktails dînatoires', 'Menu : Crevette croustillante, Falafel, Nem de cochon'], 40));
+  assert.ok(!c.some(p => p.famille === 'plat'), 'pas de dîner assis en plus du cocktail');
+});
+
+test('R2 : « 5 pièces salées + 2 sucrées » garde les 2 sucrées', () => {
+  const ps = postesDe(fiche(['RESTAURATION', '20 forfaits apéritif 5 pièces salées + 2 sucrées'], 20));
+  assert.strictEqual(ps.find(p => p.famille === 'salees_cocktail').parConvive, 5);
+  assert.strictEqual(ps.find(p => p.ref && p.ref.code === 'P051').parConvive, 2);
+  const ps2 = postesDe(devis(['Formule apéritive : 3 pièces salées + 2 sucrées 20,00 9,00 € 180,00 € 10,00%'], 20));
+  assert.strictEqual(ps2.find(p => p.ref && p.ref.code === 'P051').parConvive, 2);
+  // sans sucrées écrites : rien en plus
+  assert.ok(!postesDe(fiche(['RESTAURATION', '30 menus Procé', "3 pièces salées à l'apéritif"], 30)).some(p => p.forfait === 'mises_en_bouche' && p.ref));
+});
+
+test('R3 : « 1 coupe à l’apéritif » est un apéritif (crémant)', () => {
+  assert.deepStrictEqual(ids("17 forfaits boissons · 1 coupe à l'apéritif + 2 verres de vin + 1 boisson chaude ou sans alcool"), ['aperitif', 'soft_ou_chaude', 'verre_vin']);
+  const f = devis(["Forfaits boissons : 1 coupe à l'apéritif + 2 verres de vin + 1 boisson chaude ou sans alcool 17,00 14,50 € 246,50 € 20,00%"], 17);
+  assert.strictEqual(ligne(besoinsDe(f), /^Crémant/).verres, 17);
+  // « pour l'apéritif » seul reste un contexte
+  assert.ok(!ids("Pièces salées pour l'apéritif").includes('aperitif'));
+});
+
+test('R4 : « servi avec » n’efface pas ce qui est servi', () => {
+  assert.deepStrictEqual(ids('Déjeuner entrée + plat + dessert servi avec un verre de vin'), ['dejeuner_menu_chef', 'verre_vin']);
+  assert.deepStrictEqual(ids('Déjeuner assis servi avec café'), ['boisson_chaude', 'dejeuner_menu_chef']);
+  // « servi avec le / les … » renvoie à une autre prestation (vrais documents) : pas de cocktail ni de pièces en plus
+  assert.ok(!ids('26 verres de vin ou bière ou crémant ou sans alcool servi avec le cocktail déjeunatoire').includes('cocktail_proce'));
+  assert.deepStrictEqual(ids('6 bouteilles de champagne x 40€ HT · Servi avec les pièces salées adultes à 17h30'), ['bouteilles']);
+});
+
+test('R5 : produits de fond regroupés sur une ligne de la semaine, seuil d’un demi-conditionnement, jamais en retard', () => {
+  const evs = [];
+  ['Lundi 7 décembre 2026', 'Mercredi 9 décembre 2026', 'Vendredi 11 décembre 2026'].forEach(d => {
+    const f = lire('CLIENT\nDate : ' + d + ' Nombre : 20 personnes\nLibellé Qté PU HT Montant HT TVA\nForfait journée de travail 20,00 50,00 € 1 000,00 € 20,00%\nTotal HT', 'Devis ' + d + '.pdf');
+    f.jours.forEach(j => evs.push({ fiche: f, jour: j, postes: M.developperJour(f, j, idx, {}) }));
+  });
+  const maintenant = new Date(2026, 11, 3, 10);
+  const cmd = M.calculerCommandes(M.calculerBesoins(evs, idx, {}), idx, {}, { maintenant });
+  const cime = cmd.bons.find(b => b.slug === 'cime');
+  assert.strictEqual(cime.livraisons.length, 1, 'une seule livraison de café dans la semaine');
+  const cafe = cime.livraisons[0].lignes;
+  assert.strictEqual(cafe.length, 1, 'une seule ligne');
+  assert.strictEqual(new Set(cafe[0].pour.map(x => x.date)).size, 3, 'les trois journées sur la même ligne');
+  proche(cafe[0].besoinBrut, 600, 'besoin brut (3 × 20 convives × 10 g)');
+  proche(cafe[0].aPrendreSurReserve, 630, 'avec la marge de 5 %');
+  assert.strictEqual(cafe[0].aCommander, 0, 'pas 3 seaux de 8 kg pour 630 g');
+  assert.ok(cafe[0].reserve && cafe[0].seuilReserve === 4000);
+  assert.strictEqual(cime.livraisons[0].urgence, 'ok');
+  assert.ok(cime.livraisons[0].limite >= maintenant, 'limite jamais déjà passée');
+  assert.ok(cmd.bons.every(b => b.livraisons.every(l => !l.fond || l.urgence === 'ok')), 'jamais « retard » pour du fond');
+  // le jus en BIB : un BIB entier dès un demi-BIB de besoin
+  const jus = cmd.bons.find(b => b.slug === 'la-fourche').livraisons.find(l => l.fond).lignes[0];
+  assert.ok(jus.besoin >= 0.5 && jus.aCommander === Math.ceil(jus.besoin - 1e-9) && !jus.reserve);
+});
+
+test('R6 / cuisine-forfait-3-verres : options « parmi / au choix » = N boissons en tout, « + 1 boisson » écrit en plus est gardé', () => {
+  const parPers = lib => postesDe(devis([lib + ' 20,00 14,00 € 280,00 € 20,00%'], 20)).filter(p => p.type === 'fixe').reduce((s, p) => s + p.parConvive, 0);
+  assert.strictEqual(parPers("Forfaits boissons · 2 verres d'alcool parmi coupe de crémant, verre de vin, bière ou sans alcool + 1 boisson chaude ou sans alcool"), 3);
+  assert.strictEqual(parPers('Forfait boissons : 3 verres au choix : crémant, vin, bière ou sans alcool'), 3);
+  assert.strictEqual(parPers('Forfait boissons : 3 verres parmi (crémant, vin, bière, sans alcool)'), 3);
+  assert.strictEqual(parPers('Forfait boissons 3 verres parmi crémant, vin, bière, sans alcool'), 3);
+  assert.strictEqual(parPers('Forfait boissons 3 verres + 1 boisson chaude'), 4);
+});
+
+test('R7 : le forfait boissons n’absorbe punch / mojito / spritz que s’ils sont au choix, jamais « 1 cocktail sans alcool »', () => {
+  assert.deepStrictEqual(ids("80 forfaits boissons x 10€ · 2 verres d'alcool (dont Punch) + 1 boisson sans alcool"), ['forfait_boissons']);
+  assert.deepStrictEqual(ids('40 forfaits boissons : 3 verres parmi crémant, vin, punch, sans alcool'), ['forfait_boissons']);
+  assert.deepStrictEqual(ids("Forfait boissons 2 verres + punch à l'arrivée"), ['forfait_boissons', 'punch']);
+  const ps = postesDe(devis(['48 forfaits boissons · 1 cocktail sans alcool + 3 boissons parmi Cola / Jus de pomme Bio / Eau plate ou gazeuse / Limonade / Sirop / Boisson chaude 48,00 8,00 € 384,00 € 20,00%'], 48));
+  assert.ok(ps.some(p => p.forfait === 'mocktail'), 'les 48 cocktails sans alcool restent');
+  assert.ok(!ps.some(p => p.ref && p.ref.boisson === 'alcool'), 'pas d’alcool dans un forfait sans alcool');
+  assert.strictEqual(ps.find(p => p.ref && p.ref.boisson === 'soft').parConvive, 3);
+});
+
+test('R8 / moteur-fiche-sans-compte : une ligne en capitales qui est une pièce ou une formule n’est pas un sous-titre', () => {
+  const f = fiche(['RESTAURATION', '30 cocktails dînatoires', 'CREVETTE CROUSTILLANTE', 'FALAFEL & YAOURT AUX HERBES', 'NEM DE COCHON'], 30);
+  assert.deepStrictEqual(f.jours[0].prestations[0].choisis.map(c => c.code).sort(), ['P001', 'P007', 'P010']);
+  const t = fiche(['RESTAURATION', 'COCKTAIL DÎNATOIRE PROCÉ', 'Crevette croustillante & sauce aigre douce'], 30).jours[0].prestations;
+  assert.deepStrictEqual(t.map(p => p.forfaits), [['cocktail_proce']]);
+  assert.deepStrictEqual(t[0].choisis.map(c => c.code), ['P001']);
+  assert.deepStrictEqual(fiche(['RESTAURATION', 'BRUNCH', 'Viennoiseries, gaufres, huîtres'], 25).jours[0].prestations.map(p => p.forfaits), [['brunch']]);
+  // un titre suivi de sa ligne chiffrée ne compte qu'une fois ; un sous-titre de la formule en cours reste un sous-titre
+  assert.deepStrictEqual(fiche(['RESTAURATION', 'COCKTAIL', '40 cocktails dînatoires'], 40).jours[0].prestations.map(p => p.libelle), ['40 cocktails dînatoires']);
+  const s = fiche(['RESTAURATION', '40 cocktails dînatoires', 'PIÈCES SALÉES', 'Crevette croustillante', 'PIÈCES SUCRÉES', 'Mignardises Honoré'], 40).jours[0].prestations;
+  assert.strictEqual(s.length, 1, s.map(p => p.libelle).join(' | '));
+  assert.ok(fiche(['DÉROULÉ', '12h accueil', 'MENU', '60 menus du mois'], 60).jours[0].prestations.some(p => p.quantite === 60));
+});
+
+test('R9 : « (apéritif) » sur une ligne de boissons sans alcool n’ajoute pas de crémant', () => {
+  assert.deepStrictEqual(ids("3 boissons sans alcool (apéritif) · Choix sur place au tarif de l'établissement"), ['hors_cuisine', 'soft']);
+  assert.ok(ids('Apéritif : kir au muscadet').includes('kir'));
+});
+
+test('R10 : « Salle 2 – samedi 12 décembre » est le 12 seulement', () => {
+  assert.deepStrictEqual(M.datesDepuisTexte('Mariage – Salle 2 – samedi 12 décembre 2026', 2026), ['2026-12-12']);
+  assert.deepStrictEqual(M.datesDepuisTexte('Option 1 - 5 décembre 2026', 2026), ['2026-12-05']);
+  assert.deepStrictEqual(M.datesDepuisTexte('2 – 12 décembre 2026', 2026), ['2026-12-12']);
+  assert.deepStrictEqual(M.datesDepuisTexte('lundi 7 – mardi 8 décembre 2026', 2026), ['2026-12-07', '2026-12-08']);
+  assert.deepStrictEqual(M.datesDepuisTexte('Séminaire 4, 5 et 6 février 2027', 2026), ['2027-02-04', '2027-02-05', '2027-02-06']);
+  const f = lire('CLIENT DUPONT\nMariage – Salle 2 – samedi 12 décembre 2026\nNombre : 80 personnes\nLibellé Qté PU HT Montant HT TVA\nMenu Procé 80,00 50,00 € 4 000,00 € 10,00%\nTotal HT 4 000,00 €', 'Devis Mariage Dupont.pdf');
+  assert.deepStrictEqual(f.dates, ['2026-12-12']);
+  assert.strictEqual(f.jours.reduce((s, j) => s + postesDe(f, j).filter(p => p.famille === 'plat').reduce((a, p) => a + p.convives, 0), 0), 80);
+});
+
+test('moteur-choix-nie (relecture Claude) : les pièces refusées restent écartées, champ « exclus » accepté', () => {
+  const base = fiche(['RESTAURATION', '30 cocktails dînatoires', 'Pas de nem de cochon ni de poulet croustillant (convives ne mangeant pas de porc)'], 30);
+  const rep = { jours: [{ date: '2026-12-10', convives: 30, prestations: [{ libelle: '30 cocktails dînatoires', quantite: 30, forfaits: ['cocktail_proce'], choix: [], repartition: { viande: 0, poisson: 0, vegetarien: 0 } }] }] };
+  const f = M.normaliserLectureClaude(rep, base, idx);
+  assert.deepStrictEqual(f.jours[0].prestations[0].exclus.sort(), ['P007', 'P008']);
+  const r = postesDe(f).find(p => p.famille === 'salees_cocktail').recettes;
+  assert.ok(!r.P007 && !r.P008, JSON.stringify(r));
+  // champ « exclus » de Claude (codes du catalogue), même sans exclus dans la lecture locale
+  rep.jours[0].prestations[0].exclus = ['P001', 'XXX'];
+  const f2 = M.normaliserLectureClaude(rep, fiche(['RESTAURATION', '30 cocktails dînatoires'], 30), idx);
+  assert.deepStrictEqual(f2.jours[0].prestations[0].exclus, ['P001']);
+  assert.ok(!postesDe(f2).find(p => p.famille === 'salees_cocktail').recettes.P001);
+});
+
+test('moteur-delai-48h (heure fixe) : « avant 14h pour le lendemain », « J-1 avant 12h » = la veille à cette heure, jamais plus tard', () => {
+  const lim = delai => { const f = { delai }; f.delaiHeures = M.parseDelai(delai); return M.heureLimite('2026-12-10', f, null).limite; };
+  assert.deepStrictEqual(M.parseHeureLimite('Commande avant 14h pour livraison le lendemain'), { jours: 1, heure: 14, minutes: 0 });
+  assert.strictEqual(M.parseDelai('avant 14h pour le lendemain'), 24);
+  assert.strictEqual(M.parseDelai('J-1 avant 12h'), 24);
+  assert.strictEqual(+lim('avant 14h pour le lendemain'), +new Date(2026, 11, 9, 14));
+  assert.strictEqual(+lim('J-1 avant 12h'), +new Date(2026, 11, 9, 12));
+  assert.strictEqual(+lim('la veille avant 12h'), +new Date(2026, 11, 9, 12));
+  assert.strictEqual(+lim('avant-veille 10h'), +new Date(2026, 11, 8, 10));
+  assert.strictEqual(+lim('avant 18h la veille'), +new Date(2026, 11, 9, 17), 'ramené aux heures de bureau, plus tôt');
+  assert.strictEqual(+lim('48h'), +new Date(2026, 11, 8, 8));
+  // heure limite saisie à part (onglet fournisseurs de l'appli) + délai en heures : la plus tôt des deux
+  const i2 = M.indexer(ref, con, { fournisseurs: { cime: { nom: 'Cime', heureLimite: 'J-1 avant 12h' } } });
+  assert.ok(M.heureLimite('2026-12-10', i2.fournisseurs.cime, null).limite <= new Date(2026, 11, 9, 12));
+  const i3 = M.indexer({ fournisseurs: [], catalogue: [], composants: [], bar: [] }, { fournisseursInfos: { x: { nom: 'X', heureLimite: 'la veille avant 12h' } } }, {});
+  assert.strictEqual(+M.heureLimite('2026-12-10', i3.fournisseurs.x, null).limite, +new Date(2026, 11, 9, 12));
+});
+
+test('option reference de lireDocument / datesDepuisTexte : Date, chaîne ISO ou horodatage', () => {
+  const t = 'Brunch du nouvel an\nDate : 1er janvier Nombre : 20 personnes';
+  for (const r of [new Date(2026, 11, 28), '2026-12-28', '2026-12-28T09:00:00', new Date(2026, 11, 28).getTime()]) {
+    assert.deepStrictEqual(M.lireDocument(t, 'Devis Brunch.pdf', idx, { annee: 2026, reference: r }).dates, ['2027-01-01'], String(r));
+    assert.deepStrictEqual(M.datesDepuisTexte('1er janvier', 2026, r), ['2027-01-01'], String(r));
+  }
+  // référence invalide : ignorée (aujourd'hui ou le nom de fichier servent de repère)
+  assert.ok(Array.isArray(M.lireDocument(t, 'Devis Brunch.pdf', idx, { annee: 2026, reference: 'n/a' }).dates));
 });

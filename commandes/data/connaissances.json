@@ -142,11 +142,10 @@
     "plat + dessert",
     "menu du marche",
     "menus du marche",
-    "menu",
-    "menus",
     "menus surprises",
     "menu unique",
-    "menus uniques"
+    "menus uniques",
+    "re:\\bmenus?(?= )(?=.*\\bplats?\\b)(?=.*\\b(?:entrees?|desserts?)\\b)"
    ],
    "contenu": [
     {
@@ -266,9 +265,25 @@
       "assis",
       "puis",
       "suivi",
-      "menu",
-      "menus",
-      "entree + plat"
+      "entree + plat",
+      "plat + dessert",
+      "menu du jour",
+      "menus du jour",
+      "menu du mois",
+      "menus du mois",
+      "menu du marche",
+      "menus du marche",
+      "menu du chef",
+      "menu surprise",
+      "menus surprise",
+      "menus surprises",
+      "menu unique",
+      "menus uniques",
+      "menu de noel",
+      "menus de noel",
+      "menu proce",
+      "menus proce",
+      "re:\\bmenus?(?= )(?=.*\\bplats?\\b)(?=.*\\b(?:entrees?|desserts?)\\b)"
      ]
     },
     "mises_en_bouche",
@@ -419,9 +434,18 @@
      "principal": true,
      "label": "{n} mises en bouche du chef",
      "qteMax": 15
+    },
+    {
+     "code": "P051",
+     "qte": 2,
+     "label": "Pièces sucrées (mignardises Honoré)",
+     "sucre": true,
+     "siTexte": "\\d+\\s*(?:pi[eè]ces?\\s*)?sucr[eé]es?",
+     "qteDepuisTexte": "(?:pieces? )?sucrees?",
+     "qteMax": 8
     }
    ],
-   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne (3 par défaut)."
+   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne (3 par défaut) ; « N pièces salées + M sucrées » ajoute M mignardises Honoré."
   },
   {
    "id": "piece_speciale",
@@ -889,7 +913,7 @@
      "qte": 3,
      "boissonsDepuisTexte": "verres?",
      "qteMax": 6,
-     "saufSiTexte": "parmi[^+|·()]*sans alcool",
+     "saufSiTexte": "(?:parmi|au choix)[\\s:]*\\(?[^+|·()]*\\bsans alcool",
      "label": "Verres d'alcool (crémant, vins, bière)"
     },
     {
@@ -897,16 +921,18 @@
      "qte": 3,
      "boissonsDepuisTexte": "verres?",
      "qteMax": 6,
-     "siTexte": "parmi[^+|·()]*sans alcool",
+     "siTexte": "(?:parmi|au choix)[\\s:]*\\(?[^+|·()]*\\bsans alcool",
      "label": "Verres au choix (crémant, vins, bière, sans alcool)"
     },
     {
      "boisson": "sans_alcool_ou_chaude",
      "qte": 1,
-     "saufSiTexte": "parmi[^+|·()]*sans alcool"
+     "saufSiTexte": "^(?![\\s\\S]*\\+\\s*(?:\\d+|une?)\\s*(?:boissons?|softs?|cafes?|the)\\b)[\\s\\S]*(?:parmi|au choix)[\\s:]*\\(?[^+|·()]*\\bsans alcool",
+     "boissonsDepuisTexte": "boissons? (?:chaudes?|sans alcool|soft|fraiches?)",
+     "qteMax": 3
     }
    ],
-   "description": "N verres d'alcool (nombre lu dans le libellé, 3 par défaut) + 1 boisson sans alcool ou chaude ; « N verres parmi crémant, vin, bière, sans alcool » = N boissons en tout, sans alcool compris.",
+   "description": "N verres d'alcool (nombre lu dans le libellé, 3 par défaut) + 1 boisson sans alcool ou chaude ; « N verres parmi / au choix : crémant, vin, bière, sans alcool » = N boissons en tout, sans alcool compris, plus la boisson écrite en « + 1 boisson … ».",
    "cedeA": [
     "verre_vin",
     "aperitif",
@@ -923,10 +949,30 @@
     "coupe_champagne",
     "soft_ou_chaude",
     {
+     "id": "punch",
+     "si": [
+      "re:\\b(?:parmi|au choix|dont|choix)(?: [a-z0-9]+){0,10} (?:punchs?|planteurs?)\\b"
+     ]
+    },
+    {
+     "id": "mojito",
+     "si": [
+      "re:\\b(?:parmi|au choix|dont|choix)(?: [a-z0-9]+){0,10} (?:mojitos?)\\b"
+     ]
+    },
+    {
+     "id": "cocktail_spritz",
+     "si": [
+      "re:\\b(?:parmi|au choix|dont|choix)(?: [a-z0-9]+){0,10} (?:spritz|hugo|cocktails? signature)\\b"
+     ]
+    },
+    {
      "id": "mocktail",
      "si": [
-      "parmi",
-      "au choix"
+      "re:\\b(?:parmi|au choix|dont|choix)(?: [a-z0-9]+){0,10} (?:cocktails? sans alcool|mocktails?|virgin(?: [a-z]+)?)\\b"
+     ],
+     "saufSi": [
+      "re:\\b(?:\\d+|un|une) (?:cocktails? sans alcool|mocktails?)\\b"
      ]
     }
    ],
@@ -965,12 +1011,19 @@
     "coupe de bulles",
     "coupes de bulles",
     "bulles",
-    "cremant"
+    "cremant",
+    "coupe a l aperitif",
+    "coupes a l aperitif",
+    "coupe pour l aperitif",
+    "coupes pour l aperitif",
+    "verre a l aperitif",
+    "verres a l aperitif"
    ],
    "exclusions": [
     "aperitif dinatoire",
     "a l aperitif",
-    "pour l aperitif"
+    "pour l aperitif",
+    "re:\\b(?:sans alcool|softs?|jus de fruits?|jus de pomme|boissons? fraiches?|eaux?|sirops?) aperitifs?(?= )"
    ],
    "contenu": [
     {
@@ -1221,19 +1274,27 @@
     "forfait boisson sans alcool",
     "forfaits boissons sans alcool",
     "forfaits boisson sans alcool",
-    "cocktail sans alcool + 2 boissons sans alcool"
+    "cocktail sans alcool + 2 boissons sans alcool",
+    "re:\\b(?:\\d+|un|une) (?:cocktails? sans alcool|mocktails?) \\+ (?:\\d+|deux|trois) (?:boissons?|softs?)\\b"
    ],
    "contenu": [
     {
      "boisson": "soft",
-     "qte": 2
+     "qte": 2,
+     "boissonsDepuisTexte": "(?:boissons?|softs?)(?! chaudes?)",
+     "qteMax": 4
     }
    ],
    "absorbe": [
     "soft",
-    "boisson_chaude",
     "jus_pomme",
-    "soft_ou_chaude"
+    "soft_ou_chaude",
+    {
+     "id": "boisson_chaude",
+     "saufSi": [
+      "re:\\+ (?:\\d+|une?) (?:boissons? chaudes?|cafes?|thes?)\\b"
+     ]
+    }
    ],
    "inclut": [
     "mocktail"

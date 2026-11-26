@@ -506,6 +506,7 @@ RÈGLES
 - Une formule qui en inclut d'autres (journee_travail inclut petit-déjeuner, déjeuner et pause) ne doit pas être répétée par ses sous-parties.
 - "quantite" : le nombre de personnes ou d'unités de la ligne. "convives" du jour : le nombre final de personnes (une fiche de fonction prime sur un devis).
 - "choix" : seulement les pièces ou plats explicitement nommés dans le document, avec leur code catalogue ; "nombre_par_convive" si indiqué.
+- "exclus" : codes catalogue des pièces que le client refuse (« pas de nem », « sans porc » → les pièces concernées) ; jamais dans "choix".
 - "repartition" : nombres de plats viande / poisson / vegetarien si le document les donne.
 - "nombre_par_convive" de la prestation : nombre de pièces salées par personne si précisé (ex. 11 pièces salées).
 - "jours" : une entrée par date d'événement présente dans le document ou dans le nom du fichier (format AAAA-MM-JJ). Les codes JJMMAA du nom de fichier sont des dates.
@@ -513,7 +514,8 @@ RÈGLES
 - N'invente rien. Ne recopie ni téléphone, ni e-mail, ni IBAN.
 
 Réponds uniquement en JSON :
-{"type_document":"devis|fiche_fonction|autre","client":"","evenement":"","horaires":"","regimes":[""],"points_attention":[""],"jours":[{"date":"AAAA-MM-JJ","convives":0,"prestations":[{"libelle":"","details":"","quantite":0,"forfaits":["id"],"confiance":0.9,"choix":[{"code":"P001","nombre_par_convive":1}],"repartition":{"viande":0,"poisson":0,"vegetarien":0},"nombre_par_convive":0}]}]}
+{"type_document":"devis|fiche_fonction|autre","client":"","evenement":"","horaires":"","regimes":[""],"points_attention":[""],"jours":[{"date":"AAAA-MM-JJ","convives":0,"prestations":[{"libelle":"","details":"","quantite":0,"forfaits":["id"],"confiance":0.9,"choix":[],"exclus":[],"repartition":null,"nombre_par_convive":null}]}]}
+Format d'un élément de "choix" : {"code":"<code catalogue>","nombre_par_convive":<nombre ou null>}. "repartition", quand le document la donne : {"viande":<n>,"poisson":<n>,"vegetarien":<n>}. Laisse les listes vides et null quand le document ne dit rien.
 
 NOM DU FICHIER : ${nomFichier}
 DOCUMENT :
@@ -543,7 +545,8 @@ ${texte.slice(0, 16000)}
     return f;
   }
   function ajouterFiche(texte, nom, source, extra) {
-    const f = assainirFiche(appliquerAlias(M.lireDocument(texte, nom, S.idx, { annee: S.sem.lundi.getFullYear() })));
+    // la semaine affichée sert de repère pour une date écrite sans année (« Vendredi 1er janvier »)
+    const f = assainirFiche(appliquerAlias(M.lireDocument(texte, nom, S.idx, { annee: S.sem.lundi.getFullYear(), reference: M.iso(S.sem.lundi) })));
     Object.assign(f, { source, ajouteLe: new Date().toISOString(), ajoutePar: S.moi.id }, extra || {});
     // même fichier déjà là : on remplace
     let id = f.id; let k = 2;
