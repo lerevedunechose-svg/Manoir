@@ -119,7 +119,18 @@
     "dejeuner",
     "dej",
     "diner",
-    "repas"
+    "repas",
+    "menu de noel",
+    "menus de noel",
+    "menus p + d",
+    "menu p + d",
+    "menus e + p + d",
+    "menu e + p + d",
+    "menus e + p",
+    "menu e + p",
+    "plat + dessert",
+    "menu du marche",
+    "menus du marche"
    ],
    "contenu": [
     {
@@ -207,7 +218,13 @@
     "cocktails dejeunatoires",
     "15 pieces",
     "cocktail debout",
-    "cocktail"
+    "cocktail",
+    "cocktails",
+    "cocktails dejeunatoire",
+    "cocktail dejeunatoires",
+    "cocktails dinatoire",
+    "pieces salees",
+    "pieces salees froides"
    ],
    "exclusions": [
     "cocktail sans alcool",
@@ -225,12 +242,14 @@
      "qte": 11,
      "recettes": 8,
      "principal": true,
-     "label": "{n} pièces salées au choix du chef"
+     "label": "{n} pièces salées au choix du chef",
+     "qteDepuisTexte": "pieces? salees?"
     },
     {
      "code": "P051",
      "qte": 4,
-     "label": "4 mignardises Honoré"
+     "label": "Mignardises Honoré",
+     "qteDepuisTexte": "(?:pieces? sucrees?|mignardises?)"
     }
    ],
    "description": "11 pièces salées (8 choisies + 3 surprises du chef, une pièce peut compter double) + 4 mignardises Honoré."
@@ -639,7 +658,11 @@
     "menu ado",
     "menus ado",
     "menus ados",
-    "menu ados"
+    "menu ados",
+    "menu adolescent",
+    "menus adolescents",
+    "menu adolescents",
+    "menus adolescent"
    ],
    "contenu": [
     {
@@ -800,7 +823,16 @@
     "verre de cloture",
     "vin d honneur",
     "coupe de cremant",
-    "kir"
+    "kir",
+    "kirs",
+    "kir petillant",
+    "kirs petillants",
+    "punch",
+    "punchs",
+    "verre d arrivee",
+    "verres d arrivee",
+    "coupe de champagne",
+    "coupes de cremant"
    ],
    "exclusions": [
     "aperitif dinatoire"
@@ -821,7 +853,11 @@
     "boissons chaudes",
     "1 cafe",
     "cafe the",
-    "cafe / the"
+    "cafe / the",
+    "cafes",
+    "thes",
+    "cafe",
+    "the"
    ],
    "contenu": [
     {
@@ -876,7 +912,10 @@
     "softs",
     "boisson sans alcool",
     "boissons sans alcool",
-    "boisson fraiche"
+    "boisson fraiche",
+    "verre d arrivee sans alcool",
+    "verres d arrivee sans alcool",
+    "jus de fruits"
    ],
    "contenu": [
     {
@@ -961,6 +1000,50 @@
    ]
   },
   {
+   "id": "bouteilles",
+   "nom": "Bouteilles à la carte (vins, champagne, bulles)",
+   "famille": "Boissons",
+   "parUnite": true,
+   "motsCles": [
+    "bouteille",
+    "bouteilles",
+    "champagne",
+    "aoc",
+    "vin blanc",
+    "vin rouge",
+    "vin effervescent",
+    "bulles de l ouest",
+    "muscadet",
+    "bourgueil",
+    "cotes du rhone",
+    "muscat",
+    "saumur",
+    "txakoli",
+    "roederer",
+    "sancerre",
+    "chinon",
+    "anjou"
+   ],
+   "exclusions": [
+    "verre de vin",
+    "verres de vin",
+    "forfait"
+   ],
+   "contenu": [
+    {
+     "achat": {
+      "produit": "Vin à la carte",
+      "produitDepuisLibelle": true,
+      "fournisseur": "Cave (à préciser)",
+      "qte": 1,
+      "unite": "bouteille"
+     },
+     "qte": 1
+    }
+   ],
+   "description": "Bouteilles commandées par le client (nom du vin repris de la fiche), comptées à l'unité."
+  },
+  {
    "id": "hors_cuisine",
    "nom": "Hors cuisine (location, frais…)",
    "famille": "Hors cuisine",
@@ -992,7 +1075,14 @@
     "animation musicale",
     "deco",
     "decoration",
-    "frais de service"
+    "frais de service",
+    "droit de bouchon",
+    "configuration des espaces",
+    "personnel du manoir",
+    "service du cocktail",
+    "au tarif de l etablissement",
+    "choix sur place",
+    "a la carte"
    ]
   }
  ],

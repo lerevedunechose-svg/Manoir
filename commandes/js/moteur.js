@@ -393,6 +393,9 @@
     if (alias && alias.forfaits && alias.forfaits.length) {
       return alias.forfaits.filter(id => idx.forfaits[id]).map(id => ({ id, via: 'alias', score: 1, debut: 0, fin: t.length }));
     }
+    // une ligne qui décrit la salle (« Configuration des espaces · repas assis, nappage blanc ») n'est pas une prestation
+    const libelleSeul = norm(String(texte || '').split(' · ')[0]);
+    const estConfig = /^(configuration|location|privatisation|grande salle|petite salle|salle|salon|salons|personnel|espace|espaces|terrasse|vestiaire|mise a disposition|frais|droit de bouchon)\b/.test(libelleSeul);
     const trouves = [];
     Object.values(idx.forfaits).forEach(f => {
       (f.motsCles || []).forEach(kw => {
@@ -407,6 +410,14 @@
         }
       });
     });
+    if (estConfig) {
+      const finLibelle = 1 + libelleSeul.length + 1;
+      const alimentaires = trouves.filter(x => x.fin <= finLibelle && idx.forfaits[x.id] && !idx.forfaits[x.id].horsCuisine);
+      // « Location + DEJ + 1 verre de vin » garde ses prestations ; « Configuration des espaces … » non
+      if (!alimentaires.length || /^configuration|^(grande |petite )?salle|^salons?\b|^espaces?\b|^personnel/.test(libelleSeul)) {
+        return idx.forfaits.hors_cuisine ? [{ id: 'hors_cuisine', via: 'mot-clé', score: 0.9, debut: 0, fin: 0 }] : [];
+      }
+    }
     // supprime les correspondances englobées par une correspondance plus longue d'un autre forfait
     const gardes = trouves.filter(a => !trouves.some(b => b !== a && b.id !== a.id && b.debut <= a.debut && b.fin >= a.fin && b.longueur > a.longueur));
     const parId = {};
@@ -524,8 +535,11 @@
         if (!sous[3] || /^sale|^froid|^chaud/.test(sous[3])) dernier.nbParConvive = parseFloat(sous[1].replace(',', '.'));
         return;
       }
-      const m = n.match(/^(\d+|x)\s+(forfaits?|menus?|cocktails?|pdj|petits? dejeuners?|pauses?|brunchs?|plateaux?|planches?|mises? en bouche|portions?|verres?|bouteilles?|coupes?|gateaux?|pieces? montees?|repas|dejeuners?|diners?)\b/);
-      if (m && section !== 'deroule') {
+      // toute ligne qui commence par une quantité est une prestation (« 6 Kirs pétillants x 6€ », « 3 AOC Côtes du Rhône… »),
+      // sauf les mentions de régime (« 2 végétariens ») qui restent des remarques
+      const m = n.match(/^(\d+|x)\s+([a-z][a-z' ]*)/);
+      const regime = m && /^(vegetarien|vegan|vegetalien|allergi|sans |enfant|bebe|personne)/.test(m[2]);
+      if (m && !regime && section !== 'deroule' && (section === 'resto' || /^(forfaits?|menus?|cocktails?|pdj|petits? dejeuners?|pauses?|brunchs?|plateaux?|planches?|mises? en bouche|portions?|verres?|bouteilles?|coupes?|gateaux?|pieces? montees?|repas|dejeuners?|diners?)\b/.test(m[2]))) {
         items.push({ libelle: l, details: [], quantite: m[1] === 'x' ? null : +m[1] });
         return;
       }
@@ -720,6 +734,10 @@
   /** Convives effectifs d'une prestation : quantité du devis si c'est un forfait par personne, sinon convives du jour. */
   function convivesPrestation(p, jour, forfait) {
     if (p.quantiteForcee) return p.quantiteForcee;
+    if (forfait && forfait.parUnite) { // « 29 bouteilles de champagne », « 8 cafés » : la quantité de la ligne, pas les convives
+      const m = norm(p.libelle).match(/^(\d+)\s/);
+      return p.quantite || (m ? +m[1] : 1);
+    }
     if (jour.convivesForces && jour.convives) return jour.convives;
     if (forfait && forfait.parPersonne !== false && p.quantite && p.quantite >= 2) return Math.round(p.quantite);
     return jour.convives || (p.quantite >= 2 ? Math.round(p.quantite) : 0);
@@ -789,6 +807,11 @@
           if (c.code) { ref = { code: c.code }; label = (idx.catalogue[c.code] || {}).nom || c.code; }
           else if (c.bar) { ref = { bar: c.bar }; label = c.bar; }
           else if (c.boisson) { ref = { boisson: c.boisson }; label = (idx.con.boissons && idx.con.boissons[c.boisson] && idx.con.boissons[c.boisson].label) || c.boisson; }
+          else if (c.achat && c.achat.produitDepuisLibelle) {
+            const nom = String(p.libelle || '').replace(/^\s*\d+\s*(bouteilles?|btl|x)?\s*(de\s+)?/i, '').replace(/\s*x\s*\d+[.,]?\d*\s*€.*$/i, '').replace(/\s*[–-]\s*\d+[.,]?\d*\s*€.*$/, '').trim().slice(0, 90) || c.achat.produit;
+            const nomPropre = nom.charAt(0).toUpperCase() + nom.slice(1);
+            ref = { achat: Object.assign({}, c.achat, { produit: nomPropre }) }; label = nomPropre;
+          }
           else if (c.achat) { ref = { achat: c.achat }; label = c.achat.produit; }
           if (!ref) return;
           if (c.boissonsDepuisTexte) {

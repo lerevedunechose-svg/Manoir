@@ -209,3 +209,24 @@ test('fournisseur à long délai : une seule livraison dans la semaine', () => {
   const berjac = cmd.bons.find(b => b.slug === 'maison-berjac');
   assert.ok(berjac.livraisons.length >= 1);
 });
+
+test('fiche de fonction : boissons à l’unité et lignes de configuration', () => {
+  const t = 'Samedi 12 décembre – TEST\nNombre : 30 personnes\nCONFIGURATION DES ESPACES : 200€ · Grande salle : repas assis, nappage blanc\nRESTAURATION\n30 cocktails déjeunatoire debout : 11 pièces salées + 3 pièces sucrées au choix du chef\n6 menus adolescents x 18€\nAllergies :\n2 végétariens\nBOISSONS\n29 bouteilles de champagne x 40€ HT\n3 AOC Côtes du Rhône Colline 2022 (La Cabotte) x 30€\n6 Kirs pétillants x 6€\n8 cafés x 2€';
+  const f = M.lireDocument(t, '121226 - TEST.docx', idx);
+  const ps = f.jours[0].prestations;
+  const par = l => ps.find(p => p.libelle.indexOf(l) === 0);
+  assert.deepStrictEqual(par('30 cocktails').forfaits, ['cocktail_proce']);
+  assert.deepStrictEqual(par('6 menus adolescents').forfaits, ['menu_ado']);
+  assert.deepStrictEqual(par('29 bouteilles').forfaits, ['bouteilles']);
+  assert.deepStrictEqual(par('6 Kirs').forfaits, ['aperitif']);
+  assert.deepStrictEqual(par('8 cafés').forfaits, ['boisson_chaude']);
+  assert.ok(!ps.some(p => /^2 végétariens/.test(p.libelle)), 'un régime n’est pas une prestation');
+  assert.deepStrictEqual(M.detecterForfaits('CONFIGURATION DES ESPACES : 200€ · Grande salle : repas assis, nappage blanc', idx).map(x => x.id), ['hors_cuisine']);
+  const ev = [{ fiche: f, jour: f.jours[0], postes: M.developperJour(f, f.jours[0], idx) }];
+  const mign = ev[0].postes.find(p => p.ref && p.ref.code === 'P051');
+  assert.strictEqual(mign.parConvive, 3, '3 pièces sucrées lues dans la fiche');
+  const cave = M.calculerCommandes(M.calculerBesoins(ev, idx, { margeDefaut: 0 }), idx, {}, {}).bons.find(b => /Cave/.test(b.nom));
+  const lignes = cave.livraisons.flatMap(l => l.lignes);
+  assert.strictEqual(lignes.find(l => l.produit === 'Champagne').aCommander, 29);
+  assert.strictEqual(lignes.find(l => /Côtes du Rhône/.test(l.produit)).aCommander, 3);
+});
