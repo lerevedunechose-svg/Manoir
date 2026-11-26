@@ -1,0 +1,458 @@
+<title>La Brigade de Procé</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Commandes fournisseurs de la cuisine du Manoir de Procé à partir des devis et fiches de fonction de la semaine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Courier+Prime:wght@400;700&family=Lato:wght@400;700;900&family=Playfair+Display:wght@500;700&display=swap">
+<style>
+/* Concept : le passe de la cuisine — les fiches de la semaine sont des bons accrochés à la barre de laiton,
+   l'ardoise résume la semaine à la craie, chaque fournisseur reçoit son ticket tamponné « Envoyé ». */
+:root {
+  --vert: #2f4a3a;          /* vert du Manoir */
+  --vert-2: #4f6f5b;
+  --vert-pale: #dfe7de;
+  --fond: #eceee7;          /* plan de travail, gris sauge */
+  --papier: #fffdf7;        /* papier des bons */
+  --papier-2: #f6f2e8;
+  --encre: #1f2a24;
+  --encre-2: #59645d;
+  --trait: #d5d8cf;
+  --laiton: #b08d57;        /* barre du passe, or du Manoir */
+  --laiton-2: #8a6a39;
+  --ardoise: #25312b;
+  --craie: #f1efe6;
+  --craie-2: #b9c2bb;
+  --ok: #2f7a4a;
+  --ok-fond: #e1efe4;
+  --attention: #a8670b;
+  --attention-fond: #f8ead0;
+  --urgent: #b8432a;
+  --urgent-fond: #f7dfd8;
+  --info: #2e6688;
+  --info-fond: #dceaf2;
+  --ombre: 0 1px 0 rgba(31, 42, 36, .06), 0 6px 18px -10px rgba(31, 42, 36, .35);
+  --f-titre: "Playfair Display", Georgia, "Times New Roman", serif;
+  --f-texte: "Lato", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-ticket: "Courier Prime", "Courier New", ui-monospace, monospace;
+  --f-main: "Caveat", "Segoe Print", "Comic Sans MS", cursive;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vert: #93bf9f; --vert-2: #b4d3bc; --vert-pale: #24332b; --fond: #121815; --papier: #1c2420; --papier-2: #222b26;
+    --encre: #e8ece7; --encre-2: #a5b0a8; --trait: #34403a; --laiton: #d4b178; --laiton-2: #e2c48f;
+    --ardoise: #0d1310; --craie: #ece9df; --craie-2: #8e998f;
+    --ok: #7cc493; --ok-fond: #1d3325; --attention: #e2a84c; --attention-fond: #3a2d14; --urgent: #ee8a72; --urgent-fond: #3d211a;
+    --info: #8cc0e0; --info-fond: #18303e; --ombre: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -12px rgba(0, 0, 0, .8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --vert: #93bf9f; --vert-2: #b4d3bc; --vert-pale: #24332b; --fond: #121815; --papier: #1c2420; --papier-2: #222b26;
+  --encre: #e8ece7; --encre-2: #a5b0a8; --trait: #34403a; --laiton: #d4b178; --laiton-2: #e2c48f;
+  --ardoise: #0d1310; --craie: #ece9df; --craie-2: #8e998f;
+  --ok: #7cc493; --ok-fond: #1d3325; --attention: #e2a84c; --attention-fond: #3a2d14; --urgent: #ee8a72; --urgent-fond: #3d211a;
+  --info: #8cc0e0; --info-fond: #18303e; --ombre: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -12px rgba(0, 0, 0, .8);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--fond); color: var(--encre);
+  font: 15px/1.5 var(--f-texte);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--ardoise); }
+h1, h2, h3 { font-family: var(--f-titre); font-weight: 700; line-height: 1.15; text-wrap: balance; margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--vert); }
+:focus-visible { outline: 3px solid var(--laiton); outline-offset: 2px; }
+.cache { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums; }
+.main-ecrite { font-family: var(--f-main); font-weight: 700; }
+
+/* ---------- Bandeau (ardoise) ---------- */
+.bandeau {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  background: var(--ardoise); color: var(--craie);
+  box-shadow: 0 2px 0 var(--laiton);
+}
+.bandeau-haut { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; max-width: 1240px; margin: 0 auto; }
+.marque { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; min-width: 0; }
+.marque svg { flex: none; }
+.marque strong { font-family: var(--f-titre); font-size: 1.35rem; letter-spacing: .01em; display: block; }
+.marque span { display: block; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--laiton); }
+.semaine-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.semaine-nav button { background: transparent; border: 1px solid rgba(241, 239, 230, .25); color: var(--craie); border-radius: 999px; width: 34px; height: 34px; cursor: pointer; }
+.semaine-nav button:hover { border-color: var(--laiton); }
+.semaine-libelle { font-family: var(--f-main); font-size: 1.45rem; line-height: 1; padding: 0 6px; text-align: center; min-width: 11ch; white-space: nowrap; }
+.semaine-libelle small { display: block; font-family: var(--f-texte); font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--craie-2); }
+.moi { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(241, 239, 230, .2); border-radius: 999px; padding: 3px 12px 3px 4px; cursor: pointer; background: transparent; color: var(--craie); }
+.moi .toques { font-family: var(--f-ticket); font-weight: 700; color: var(--laiton); }
+.onglets { display: flex; gap: 2px; overflow-x: auto; max-width: 1240px; margin: 10px auto 0; scrollbar-width: none; }
+.onglets::-webkit-scrollbar { display: none; }
+.onglets a {
+  flex: none; display: flex; align-items: center; gap: 7px; padding: 9px 13px 10px; text-decoration: none; color: var(--craie-2);
+  border-radius: 8px 8px 0 0; font-size: .86rem; letter-spacing: .02em; white-space: nowrap;
+}
+.onglets a .n { font-family: var(--f-ticket); font-size: .75rem; border: 1px solid currentColor; border-radius: 999px; width: 20px; height: 20px; display: inline-grid; place-items: center; }
+.onglets a:hover { color: var(--craie); }
+.onglets a[aria-current="page"] { background: var(--fond); color: var(--encre); font-weight: 700; }
+.onglets .sep { width: 1px; background: rgba(241, 239, 230, .18); margin: 8px 6px; flex: none; }
+
+/* ---------- Structure ---------- */
+main { max-width: 1240px; margin: 0 auto; padding-top: 22px; display: grid; gap: 22px; }
+.vue { display: grid; gap: 20px; min-width: 0; }
+.vue[hidden] { display: none !important; }
+.tete-vue { display: flex; align-items: end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tete-vue h1 { font-size: clamp(1.5rem, 3.2vw, 2.1rem); color: var(--vert); }
+.tete-vue p { margin: 4px 0 0; color: var(--encre-2); max-width: 62ch; }
+.etape { font-size: .72rem; letter-spacing: .2em; text-transform: uppercase; color: var(--laiton-2); font-weight: 700; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ---------- Boutons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  padding: 9px 16px; border-radius: 999px; border: 1px solid var(--vert); background: var(--vert); color: var(--papier);
+  font-weight: 700; font-size: .9rem; text-decoration: none; transition: transform .12s ease, background .12s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; transform: none; }
+.btn.clair { background: transparent; color: var(--vert); }
+.btn.laiton { background: var(--laiton); border-color: var(--laiton); color: #1d1608; }
+.btn.petit { padding: 5px 11px; font-size: .8rem; }
+.btn.fantome { border-color: transparent; background: transparent; color: var(--encre-2); }
+.btn.fantome:hover { color: var(--encre); background: var(--papier-2); }
+.btn.gros { padding: 14px 26px; font-size: 1.02rem; }
+.lien { background: none; border: 0; padding: 0; color: var(--vert); text-decoration: underline; cursor: pointer; }
+
+/* ---------- Ardoise ---------- */
+.ardoise {
+  background: var(--ardoise); color: var(--craie); border-radius: 10px; padding: 16px 20px;
+  border: 6px solid #6b4e2c; box-shadow: inset 0 0 40px rgba(0, 0, 0, .35), var(--ombre);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 18px;
+}
+:root[data-theme="dark"] .ardoise { border-color: #4a3620; }
+.ardoise .bloc { min-width: 0; }
+.ardoise .valeur { font-family: var(--f-main); font-size: 2.3rem; line-height: 1; }
+.ardoise .label { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--craie-2); }
+.ardoise .bloc.large { grid-column: span 2; }
+.ardoise .prochaine { font-family: var(--f-main); font-size: 1.35rem; line-height: 1.15; }
+@media (max-width: 520px) { .ardoise .bloc.large { grid-column: 1 / -1; } }
+
+/* ---------- Passe (zone de dépôt) ---------- */
+.passe {
+  position: relative; border-radius: 10px; padding: 26px 18px 18px; background: var(--papier-2);
+  border: 2px dashed var(--trait); display: grid; gap: 12px; justify-items: center; text-align: center; transition: border-color .15s, background .15s;
+}
+.passe::before {
+  content: ""; position: absolute; left: 10px; right: 10px; top: 10px; height: 8px; border-radius: 4px;
+  background: linear-gradient(180deg, #d8bd8a, var(--laiton) 55%, var(--laiton-2));
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .25);
+}
+.passe.survol { border-color: var(--laiton); background: var(--vert-pale); }
+.passe h2 { font-size: 1.25rem; color: var(--vert); margin-top: 8px; }
+.passe p { margin: 0; color: var(--encre-2); max-width: 60ch; }
+.passe .formats { font-family: var(--f-ticket); font-size: .8rem; color: var(--encre-2); }
+
+/* ---------- Tickets (fiches) ---------- */
+.rail { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 22px 18px; align-items: start; }
+.ticket {
+  position: relative; background: var(--papier); border-radius: 3px; box-shadow: var(--ombre); padding: 22px 16px 16px; min-width: 0;
+  --pince: var(--laiton);
+}
+.ticket::before { /* pince du passe */
+  content: ""; position: absolute; top: -9px; left: 50%; width: 56px; height: 16px; margin-left: -28px; border-radius: 3px;
+  background: linear-gradient(180deg, #e3c999, var(--pince)); box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+.ticket::after { /* bord dentelé du bas */
+  content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 8px;
+  background: radial-gradient(circle at 6px 0, var(--papier) 5.5px, transparent 6px) 0 0 / 12px 8px repeat-x;
+}
+.ticket:nth-child(3n+1) { transform: rotate(-.4deg); }
+.ticket:nth-child(3n+2) { transform: rotate(.35deg); }
+@media (prefers-reduced-motion: reduce) { .ticket { transform: none !important; } }
+.ticket-tete { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.ticket h3 { font-size: 1.15rem; color: var(--encre); overflow-wrap: anywhere; }
+.ticket .sous { color: var(--encre-2); font-size: .85rem; }
+.ticket .ligne-fichier { font-family: var(--f-ticket); font-size: .74rem; color: var(--encre-2); overflow-wrap: anywhere; }
+.ticket hr { border: 0; border-top: 1px dashed var(--trait); margin: 12px 0; }
+.ticket .jours { display: grid; gap: 10px; }
+.jour { display: grid; gap: 6px; }
+.jour.hors { opacity: .5; }
+.jour-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--f-ticket); font-weight: 700; }
+.jour-tete input { width: 4.2em; font-family: var(--f-ticket); font-weight: 700; text-align: right; padding: 2px 6px; border: 1px solid var(--trait); border-radius: 4px; background: var(--papier-2); }
+.prestation { display: grid; gap: 4px; padding: 8px 10px; border-radius: 5px; background: var(--papier-2); border-left: 3px solid var(--trait); }
+.prestation.ok { border-left-color: var(--ok); }
+.prestation.doute { border-left-color: var(--attention); }
+.prestation.inconnu { border-left-color: var(--urgent); }
+.prestation.hors-cuisine { opacity: .62; }
+.prestation .lib { font-size: .87rem; overflow-wrap: anywhere; }
+.prestation .det { font-size: .78rem; color: var(--encre-2); overflow-wrap: anywhere; }
+.puces { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.puce {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px; font-size: .76rem; font-weight: 700;
+  background: var(--vert-pale); color: var(--vert); border: 1px solid transparent; white-space: nowrap; max-width: 100%;
+}
+.puce.attention { background: var(--attention-fond); color: var(--attention); }
+.puce.urgent { background: var(--urgent-fond); color: var(--urgent); }
+.puce.info { background: var(--info-fond); color: var(--info); }
+.puce.neutre { background: transparent; border-color: var(--trait); color: var(--encre-2); }
+.puce.ok { background: var(--ok-fond); color: var(--ok); }
+.puce button { border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font-weight: 900; line-height: 1; }
+.statut-lecture { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--encre-2); }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--trait); border-top-color: var(--vert); animation: tourne .8s linear infinite; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+.regimes { font-family: var(--f-main); font-size: 1.15rem; color: var(--urgent); line-height: 1.2; }
+
+/* ---------- Menu du chef ---------- */
+.journee { display: grid; gap: 12px; }
+.journee > h2 { font-size: 1.3rem; color: var(--vert); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.journee > h2 small { font-family: var(--f-texte); font-size: .8rem; color: var(--encre-2); font-weight: 400; }
+.service { background: var(--papier); border-radius: 8px; box-shadow: var(--ombre); padding: 14px 16px; display: grid; gap: 12px; min-width: 0; }
+.service-tete { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.service-tete h3 { font-size: 1.05rem; }
+.poste { display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--trait); }
+.poste-tete { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.poste-tete strong { font-size: .93rem; }
+.recettes { display: flex; flex-wrap: wrap; gap: 6px; }
+.recette {
+  display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--trait); border-radius: 999px; background: var(--papier-2);
+  font-size: .82rem; overflow: hidden; max-width: 100%;
+}
+.recette .nom { padding: 4px 8px 4px 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
+.recette .qte { font-family: var(--f-ticket); font-weight: 700; padding: 4px 6px; background: var(--vert-pale); color: var(--vert); }
+.recette button { border: 0; background: transparent; cursor: pointer; padding: 4px 8px; color: var(--encre-2); font-weight: 900; }
+.recette button:hover { background: var(--fond); color: var(--encre); }
+.recette.non-modelise .nom::after { content: " *"; color: var(--attention); }
+.fixes { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .84rem; color: var(--encre-2); }
+.fixes span b { font-family: var(--f-ticket); color: var(--encre); }
+select.ajout { border: 1px dashed var(--trait); border-radius: 999px; background: transparent; padding: 4px 10px; font-size: .82rem; max-width: 100%; }
+
+/* ---------- Tableaux ---------- */
+.tableau-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th { text-align: left; font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--encre-2); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--trait); }
+td { padding: 7px 8px; border-bottom: 1px dashed var(--trait); vertical-align: top; }
+td.qte, th.qte { text-align: right; font-family: var(--f-ticket); white-space: nowrap; }
+td.fort { font-weight: 700; color: var(--encre); }
+tr.zero td { color: var(--encre-2); }
+.stock-input { width: 6.5em; text-align: right; font-family: var(--f-ticket); font-weight: 700; padding: 6px 8px; border: 1px solid var(--trait); border-radius: 6px; background: var(--papier); }
+.stock-input:focus { border-color: var(--vert); }
+
+/* ---------- Bons de commande ---------- */
+.bons { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 24px 20px; align-items: start; }
+.bon { position: relative; background: var(--papier); box-shadow: var(--ombre); border-radius: 3px; padding: 20px 16px 18px; min-width: 0; }
+.bon::after { content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 8px; background: radial-gradient(circle at 6px 0, var(--papier) 5.5px, transparent 6px) 0 0 / 12px 8px repeat-x; }
+.bon-tete { display: grid; gap: 4px; }
+.bon-tete h3 { font-size: 1.2rem; overflow-wrap: anywhere; }
+.bon-tete .livre { color: var(--encre-2); font-size: .84rem; }
+.bon .infos { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--encre-2); }
+.bon .infos b { color: var(--encre); font-weight: 700; }
+.livraison { margin-top: 12px; display: grid; gap: 6px; }
+.livraison-tete { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--f-ticket); font-weight: 700; }
+.bon table { font-family: var(--f-ticket); font-size: .84rem; }
+.bon td:first-child { font-family: var(--f-texte); }
+.alerte { font-size: .8rem; color: var(--attention); display: flex; gap: 6px; }
+.tampon {
+  position: absolute; bottom: 16px; right: 16px; font-family: var(--f-ticket); font-weight: 700; letter-spacing: .12em; font-size: 1.15rem;
+  color: var(--urgent); border: 3px double var(--urgent); padding: 2px 10px; border-radius: 4px; transform: rotate(-9deg); opacity: 0; pointer-events: none;
+}
+.bon.envoye .tampon { opacity: .85; animation: tampon .45s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: var(--retard, 0s); }
+@keyframes tampon { from { opacity: 0; transform: rotate(-9deg) scale(2.4); } to { opacity: .85; transform: rotate(-9deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .bon.envoye .tampon { animation: none; } }
+.sortir { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; background: var(--vert); color: var(--papier); padding: 16px 20px; border-radius: 10px; }
+.sortir p { margin: 0; max-width: 60ch; }
+.sortir .btn.laiton { font-size: 1rem; }
+
+/* ---------- Cartes génériques ---------- */
+.carte { background: var(--papier); border-radius: 8px; box-shadow: var(--ombre); padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.carte h3 { font-size: 1.08rem; }
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
+.champ { display: grid; gap: 4px; font-size: .84rem; }
+.champ input, .champ textarea, .champ select { padding: 8px 10px; border: 1px solid var(--trait); border-radius: 6px; background: var(--papier); min-width: 0; }
+.champ textarea { min-height: 90px; resize: vertical; font-family: var(--f-ticket); font-size: .82rem; }
+.ligne-saisie { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--trait); border-radius: 999px; background: var(--papier); }
+.deux { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.note { font-size: .82rem; color: var(--encre-2); }
+.vide {
+  display: grid; justify-items: center; text-align: center; gap: 10px; padding: 34px 16px; color: var(--encre-2);
+  background: var(--papier); border-radius: 8px; border: 1px dashed var(--trait);
+}
+.vide .main-ecrite { font-size: 1.7rem; color: var(--vert); }
+.verdicts { display: inline-flex; border: 1px solid var(--trait); border-radius: 999px; overflow: hidden; }
+.verdicts button { border: 0; background: transparent; padding: 5px 10px; cursor: pointer; font-size: .8rem; }
+.verdicts button[aria-pressed="true"][data-v="manque"] { background: var(--urgent-fond); color: var(--urgent); font-weight: 700; }
+.verdicts button[aria-pressed="true"][data-v="juste"] { background: var(--ok-fond); color: var(--ok); font-weight: 700; }
+.verdicts button[aria-pressed="true"][data-v="trop"] { background: var(--info-fond); color: var(--info); font-weight: 700; }
+.claude-bulle { border-left: 3px solid var(--laiton); background: var(--papier-2); padding: 10px 12px; border-radius: 0 6px 6px 0; white-space: pre-wrap; font-size: .9rem; }
+.barres { display: flex; align-items: end; gap: 4px; height: 90px; padding-top: 6px; }
+.barres div { flex: 1; background: var(--vert-2); border-radius: 3px 3px 0 0; min-height: 2px; position: relative; }
+.barres div span { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .66rem; color: var(--encre-2); }
+.classement { display: grid; gap: 8px; }
+.membre { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; background: var(--papier); padding: 10px 14px; border-radius: 8px; box-shadow: var(--ombre); }
+.membre .rang { font-family: var(--f-main); font-size: 1.6rem; color: var(--laiton-2); text-align: center; }
+.membre .grade { font-size: .78rem; color: var(--encre-2); }
+.membre .pts { font-family: var(--f-ticket); font-weight: 700; font-size: 1.1rem; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(30px);
+  background: var(--ardoise); color: var(--craie); padding: 10px 18px; border-radius: 999px; box-shadow: var(--ombre);
+  opacity: 0; transition: opacity .2s, transform .2s; z-index: 50; max-width: calc(100vw - 32px); font-size: .92rem; pointer-events: none;
+}
+#toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast .main-ecrite { color: var(--laiton); font-size: 1.2rem; margin-right: 6px; }
+
+/* ---------- Fenêtre ---------- */
+.fenetre-fond { position: fixed; inset: 0; background: rgba(13, 19, 16, .55); z-index: 40; display: grid; place-items: center; padding: 16px; }
+.fenetre { background: var(--papier); color: var(--encre); border-radius: 10px; max-width: 640px; width: 100%; max-height: calc(100vh - 32px); overflow: auto; padding: 18px; display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+.fenetre h2 { font-size: 1.3rem; color: var(--vert); }
+.liste-choix { display: grid; gap: 6px; }
+.liste-choix label { display: flex; gap: 10px; align-items: start; padding: 8px 10px; border-radius: 6px; background: var(--papier-2); font-size: .88rem; }
+.liste-choix label small { display: block; color: var(--encre-2); }
+
+@media (max-width: 640px) {
+  .bandeau { position: static; }
+  body::before { display: none; }
+  .bandeau-haut { flex-wrap: nowrap; gap: 8px; }
+  .marque > span { display: none; }
+  .semaine-nav { margin-left: auto; }
+  .semaine-libelle { font-size: 1.05rem; min-width: 0; }
+  .moi { padding: 3px 8px 3px 4px; }
+  .moi .nom-moi, .moi .mot-toques { display: none; }
+  .bon .col-sec { display: none; }
+  .ardoise .valeur { font-size: 1.9rem; }
+}
+</style>
+
+<header class="bandeau">
+  <div class="bandeau-haut">
+    <a class="marque" href="#fiches" aria-label="La Brigade de Procé, accueil">
+      <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M10 22c-5 0-7-4-6-7 1-4 5-5 8-3 1-5 5-8 8-8s7 3 8 8c3-2 7-1 8 3 1 3-1 7-6 7v9H10z" fill="#f1efe6"/>
+        <path d="M10 27h20v6H10z" fill="#b08d57"/>
+        <path d="M14 22v5M20 21v6M26 22v5" stroke="#25312b" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span><strong>La Brigade de Procé</strong><span>Commandes cuisine · Manoir de Procé</span></span>
+    </a>
+    <div class="semaine-nav" role="group" aria-label="Semaine">
+      <button type="button" id="semPrec" aria-label="Semaine précédente">‹</button>
+      <div class="semaine-libelle" id="semLibelle" aria-live="polite">Semaine</div>
+      <button type="button" id="semSuiv" aria-label="Semaine suivante">›</button>
+    </div>
+    <button type="button" class="moi" id="moi" title="Ma brigade"><span id="moiAvatar" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="#4f6f5b"/><path d="M12 20c-4 0-5-3-4-5 1-3 4-3 6-2 1-4 4-6 6-6s5 2 6 6c2-1 5-1 6 2 1 2 0 5-4 5v6H12z" fill="#f1efe6"/></svg>
+    </span><span class="nom-moi" id="moiNom">Moi</span> <span class="toques" id="moiToques">0</span></button>
+  </div>
+  <nav class="onglets" aria-label="Étapes">
+    <a href="#fiches" data-vue="fiches"><span class="n">1</span>Les fiches</a>
+    <a href="#menu" data-vue="menu"><span class="n">2</span>Menu du chef</a>
+    <a href="#inventaire" data-vue="inventaire"><span class="n">3</span>Inventaire express</a>
+    <a href="#bons" data-vue="bons"><span class="n">4</span>Bons de commande</a>
+    <a href="#retour" data-vue="retour"><span class="n">5</span>Retour de service</a>
+    <span class="sep" aria-hidden="true"></span>
+    <a href="#fournisseurs" data-vue="fournisseurs">Fournisseurs</a>
+    <a href="#carnet" data-vue="carnet">Carnet de Claude</a>
+    <a href="#brigade" data-vue="brigade">La brigade</a>
+  </nav>
+</header>
+
+<main id="app">
+  <section class="vue" id="vue-fiches" data-vue="fiches" aria-labelledby="t-fiches">
+    <div class="tete-vue">
+      <div><div class="etape">Étape 1 · la semaine</div><h1 id="t-fiches">Les fiches de la semaine</h1>
+        <p>Déposez les devis et les fiches de fonction : chaque document devient un bon accroché au passe, avec ses jours, ses convives et ses formules.</p></div>
+      <div class="actions" id="actionsFiches"></div>
+    </div>
+    <div class="ardoise" id="ardoise" aria-label="Résumé de la semaine"></div>
+    <div class="passe" id="passe">
+      <h2>Glissez les fiches ici</h2>
+      <p>Devis du logiciel de facturation, fiches de fonction (FF), ou le classeur « Fiches techniques cuisine » pour mettre à jour les grammages.</p>
+      <div class="actions" style="justify-content:center">
+        <label class="btn" for="fichiers">Choisir des fichiers</label>
+        <input class="cache" type="file" id="fichiers" multiple accept=".pdf,.docx,.txt,.md,.xlsx,.xls">
+        <button class="btn clair" type="button" id="btnDrive" hidden>Chercher dans le Drive</button>
+        <button class="btn fantome" type="button" id="btnColler">Coller un texte</button>
+      </div>
+      <div class="formats">PDF · Word (.docx) · texte · Excel (.xlsx)</div>
+    </div>
+    <div id="listeFiches"></div>
+  </section>
+
+  <section class="vue" id="vue-menu" data-vue="menu" hidden aria-labelledby="t-menu">
+    <div class="tete-vue">
+      <div><div class="etape">Étape 2 · le chef ajuste</div><h1 id="t-menu">Le menu du chef</h1>
+        <p>Pour chaque service, l'appli propose les pièces « au choix du chef » : variées, de saison, et de plus en plus proches de vos habitudes. Retirez, ajoutez, changez les quantités, puis validez.</p></div>
+      <div class="actions"><button class="btn clair" type="button" id="btnToutValider">Tout valider</button></div>
+    </div>
+    <div id="listeMenu"></div>
+  </section>
+
+  <section class="vue" id="vue-inventaire" data-vue="inventaire" hidden aria-labelledby="t-inv">
+    <div class="tete-vue">
+      <div><div class="etape">Étape 3 · chambre froide et réserve</div><h1 id="t-inv">Inventaire express</h1>
+        <p>Indiquez ce qu'il reste déjà : l'appli le déduit des commandes. Laissez vide quand il n'y a rien.</p></div>
+      <div class="actions" id="actionsInventaire"></div>
+    </div>
+    <div id="listeInventaire"></div>
+  </section>
+
+  <section class="vue" id="vue-bons" data-vue="bons" hidden aria-labelledby="t-bons">
+    <div class="tete-vue">
+      <div><div class="etape">Étape 4 · on envoie</div><h1 id="t-bons">Les bons de commande</h1>
+        <p>Un bon par fournisseur et par livraison, avec l'heure limite pour commander. Le PDF reprend tout, prêt à afficher en cuisine.</p></div>
+      <div class="actions"><label class="note"><input type="checkbox" id="optUneLivraison"> Une seule livraison par fournisseur</label></div>
+    </div>
+    <div id="listeBons"></div>
+  </section>
+
+  <section class="vue" id="vue-retour" data-vue="retour" hidden aria-labelledby="t-retour">
+    <div class="tete-vue">
+      <div><div class="etape">Étape 5 · on apprend</div><h1 id="t-retour">Retour de service</h1>
+        <p>Après la semaine : il en manquait, c'était juste, il en restait trop ? Chaque réponse ajuste les quantités des prochaines commandes.</p></div>
+      <div class="actions" id="actionsRetour"></div>
+    </div>
+    <div id="listeRetour"></div>
+  </section>
+
+  <section class="vue" id="vue-fournisseurs" data-vue="fournisseurs" hidden aria-labelledby="t-fourn">
+    <div class="tete-vue">
+      <div><div class="etape">Carnet d'adresses</div><h1 id="t-fourn">Les fournisseurs</h1>
+        <p>Délais, jours de livraison, conditionnements et prix relevés. Claude dans Chrome peut aller les vérifier sur les sites des fournisseurs pour vous.</p></div>
+      <div class="actions" id="actionsFournisseurs"></div>
+    </div>
+    <div id="listeFournisseurs"></div>
+  </section>
+
+  <section class="vue" id="vue-carnet" data-vue="carnet" hidden aria-labelledby="t-carnet">
+    <div class="tete-vue">
+      <div><div class="etape">Ce que Claude apprend</div><h1 id="t-carnet">Le carnet de Claude</h1>
+        <p>Tout ce que l'équipe a appris à l'appli : vos libellés de devis, les habitudes du chef, les quantités corrigées après service. Rien n'est figé, tout se corrige.</p></div>
+      <div class="actions" id="actionsCarnet"></div>
+    </div>
+    <div id="listeCarnet"></div>
+  </section>
+
+  <section class="vue" id="vue-brigade" data-vue="brigade" hidden aria-labelledby="t-brigade">
+    <div class="tete-vue">
+      <div><div class="etape">Le jeu</div><h1 id="t-brigade">La brigade</h1>
+        <p>Chaque coup de main rapporte des toques : déposer une fiche, apprendre un libellé à Claude, faire l'inventaire, sortir les bons, faire le retour de service.</p></div>
+    </div>
+    <div id="listeBrigade"></div>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="fenetre"></div>
+
+<script src="js/moteur.js"></script>
+<script src="js/rapport.js"></script>
+<script src="js/app.js"></script>

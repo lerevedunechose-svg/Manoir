@@ -1,0 +1,1524 @@
+{
+ "version": "2026-11-26",
+ "source": "Brochures 2026-2027 (cocktail debout, repas assis, brunch, journée de travail, cocktail pro), fiches événement vierges, Calcul prix cocktail, Cocktail et Carte été 2026, classeur Fiches techniques cuisine.",
+ "forfaits": [
+  {
+   "id": "journee_travail",
+   "nom": "Journée de travail",
+   "famille": "Séminaire",
+   "motsCles": [
+    "journee de travail",
+    "forfait journee",
+    "journee d etude",
+    "journees d etude",
+    "journee complete",
+    "seminaire journee",
+    "forfait seminaire",
+    "journee seminaire"
+   ],
+   "inclut": [
+    "petit_dejeuner",
+    "dejeuner_menu_chef",
+    "pause_boisson"
+   ],
+   "description": "Petit-déjeuner d'accueil + déjeuner entrée/plat/dessert + une pause boisson."
+  },
+  {
+   "id": "demi_journee",
+   "nom": "Demi-journée",
+   "famille": "Séminaire",
+   "motsCles": [
+    "demi journee",
+    "demi journees",
+    "1/2 journee",
+    "forfait demi"
+   ],
+   "inclut": [
+    "petit_dejeuner",
+    "dejeuner_menu_chef"
+   ],
+   "description": "Petit-déjeuner d'accueil (ou pause) + déjeuner complet."
+  },
+  {
+   "id": "petit_dejeuner",
+   "nom": "Petit-déjeuner d'accueil",
+   "famille": "Séminaire",
+   "motsCles": [
+    "petit dejeuner",
+    "petits dejeuners",
+    "pdj",
+    "petit dej",
+    "accueil cafe",
+    "cafe d accueil",
+    "viennoiseries"
+   ],
+   "contenu": [
+    {
+     "boisson": "chaude",
+     "qte": 1
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "qte": 1
+    },
+    {
+     "code": "P055",
+     "qte": 2
+    }
+   ],
+   "description": "1 boisson chaude + 1 jus de pomme bio + 2 mini-viennoiseries pur beurre.",
+   "absorbe": [
+    "boisson_chaude",
+    "jus_pomme"
+   ]
+  },
+  {
+   "id": "pause_boisson",
+   "nom": "Pause boisson",
+   "famille": "Séminaire",
+   "motsCles": [
+    "pause boisson",
+    "pauses boissons",
+    "pause cafe",
+    "pause gourmande",
+    "pause fraiche",
+    "pause"
+   ],
+   "contenu": [
+    {
+     "boisson": "pause",
+     "qte": 1
+    }
+   ],
+   "description": "1 boisson fraîche ou chaude par personne.",
+   "absorbe": [
+    "boisson_chaude",
+    "soft"
+   ]
+  },
+  {
+   "id": "dejeuner_menu_chef",
+   "nom": "Déjeuner entrée + plat + dessert",
+   "famille": "Repas assis",
+   "motsCles": [
+    "dejeuner complet",
+    "entree + plat + dessert",
+    "entree plat dessert",
+    "entree + plat",
+    "menu du jour",
+    "menus du jour",
+    "menu du mois",
+    "menus du mois",
+    "menu surprise",
+    "menus surprise",
+    "menu du chef",
+    "dejeuner de travail",
+    "dejeuner assis",
+    "repas assis",
+    "diner assis",
+    "dejeuner",
+    "dej",
+    "diner",
+    "repas"
+   ],
+   "contenu": [
+    {
+     "choix": "entree",
+     "qte": 1
+    },
+    {
+     "choix": "plat",
+     "qte": 1,
+     "principal": true
+    },
+    {
+     "code": "P037",
+     "qte": 1
+    },
+    {
+     "code": "P038",
+     "qte": 1
+    },
+    {
+     "code": "P039",
+     "qte": 1
+    },
+    {
+     "choix": "dessert",
+     "qte": 1
+    }
+   ],
+   "description": "Menu unique au choix du chef : entrée + plat (purée, légumes, jus) + dessert. Répartition viande / poisson / végétarien si indiquée.",
+   "absorbe": [
+    "mignardises"
+   ]
+  },
+  {
+   "id": "menu_proce",
+   "nom": "Menu Procé",
+   "famille": "Repas assis",
+   "motsCles": [
+    "menu proce",
+    "menus proce"
+   ],
+   "absorbe": [
+    "dejeuner_menu_chef",
+    "mignardises"
+   ],
+   "contenu": [
+    {
+     "choix": "entree",
+     "qte": 1
+    },
+    {
+     "choix": "plat",
+     "qte": 1,
+     "principal": true
+    },
+    {
+     "code": "P037",
+     "qte": 1
+    },
+    {
+     "code": "P038",
+     "qte": 1
+    },
+    {
+     "code": "P039",
+     "qte": 1
+    },
+    {
+     "choix": "dessert",
+     "qte": 1
+    }
+   ],
+   "description": "Entrée + plat + dessert choisis par le client dans la carte Procé (35 €)."
+  },
+  {
+   "id": "cocktail_proce",
+   "nom": "Cocktail Procé (15 pièces)",
+   "famille": "Cocktail",
+   "motsCles": [
+    "cocktail proce",
+    "cocktails proce",
+    "cocktail dinatoire",
+    "cocktails dinatoires",
+    "cocktail dejeunatoire",
+    "cocktails dejeunatoires",
+    "15 pieces",
+    "cocktail debout",
+    "cocktail"
+   ],
+   "exclusions": [
+    "cocktail sans alcool",
+    "cocktail convivial",
+    "atelier cocktail",
+    "ateliers cocktail"
+   ],
+   "absorbe": [
+    "mignardises",
+    "dejeuner_menu_chef"
+   ],
+   "contenu": [
+    {
+     "choix": "salees_cocktail",
+     "qte": 11,
+     "recettes": 8,
+     "principal": true,
+     "label": "{n} pièces salées au choix du chef"
+    },
+    {
+     "code": "P051",
+     "qte": 4,
+     "label": "4 mignardises Honoré"
+    }
+   ],
+   "description": "11 pièces salées (8 choisies + 3 surprises du chef, une pièce peut compter double) + 4 mignardises Honoré."
+  },
+  {
+   "id": "cocktail_convivial",
+   "nom": "Cocktail convivial",
+   "famille": "Cocktail",
+   "motsCles": [
+    "cocktail convivial",
+    "cocktails conviviaux",
+    "convivial"
+   ],
+   "contenu": [
+    {
+     "code": "P042",
+     "qte": 1,
+     "label": "Charcuterie de Talensac 50 g"
+    },
+    {
+     "code": "P041",
+     "qte": 1,
+     "label": "Plateau de fromages Beillevaire 50 g"
+    },
+    {
+     "achat": {
+      "produit": "Tartinade végétarienne maison",
+      "fournisseur": "Production maison",
+      "qte": 25,
+      "unite": "g"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Pain Emma",
+      "fournisseur": "Emma",
+      "qte": 75,
+      "unite": "g"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Cake maison ou focaccia",
+      "fournisseur": "Production maison",
+      "qte": 50,
+      "unite": "g"
+     },
+     "qte": 1
+    },
+    {
+     "choix": "navettes",
+     "qte": 2,
+     "recettes": 2,
+     "label": "2 navettes briochées"
+    },
+    {
+     "code": "P051",
+     "qte": 3,
+     "label": "3 mignardises Honoré"
+    }
+   ],
+   "description": "Charcuterie 50 g, fromages 50 g, tartinade VG 25 g, pain Emma 75 g, cake 50 g, 2 navettes, 3 mignardises.",
+   "absorbe": [
+    "mignardises",
+    "plateau_fromages",
+    "planche_charcuterie",
+    "cocktail_proce"
+   ]
+  },
+  {
+   "id": "mises_en_bouche",
+   "nom": "Mises en bouche",
+   "famille": "Apéritif",
+   "motsCles": [
+    "mises en bouche",
+    "mise en bouche",
+    "amuse bouche",
+    "amuses bouches"
+   ],
+   "contenu": [
+    {
+     "choix": "salees_cocktail",
+     "qte": 3,
+     "qteDepuisTexte": "(?:mises? en bouche|par personne|par pers|pieces? par)",
+     "recettes": 3,
+     "recettesDepuisTexte": "(?:mises? en bouche|par personne|par pers|pieces? par)",
+     "principal": true,
+     "label": "{n} mises en bouche du chef"
+    }
+   ],
+   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne."
+  },
+  {
+   "id": "piece_speciale",
+   "nom": "Pièce spéciale cocktail",
+   "famille": "Cocktail",
+   "motsCles": [
+    "piece speciale",
+    "pieces speciales"
+   ],
+   "contenu": [
+    {
+     "choix": "speciales",
+     "qte": 1,
+     "recettes": 1,
+     "principal": true
+    }
+   ]
+  },
+  {
+   "id": "piece_froide",
+   "nom": "Pièce froide en ajout",
+   "famille": "Cocktail",
+   "motsCles": [
+    "piece froide",
+    "pieces froides"
+   ],
+   "contenu": [
+    {
+     "choix": "salees_cocktail",
+     "qte": 1,
+     "recettes": 1,
+     "principal": true
+    }
+   ]
+  },
+  {
+   "id": "plateau_fromages",
+   "nom": "Plateau de fromages Beillevaire",
+   "famille": "Planches",
+   "motsCles": [
+    "plateau de fromages",
+    "plateau fromages",
+    "plateaux de fromages",
+    "fromages beillevaire",
+    "plateau de fromage"
+   ],
+   "contenu": [
+    {
+     "code": "P041",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "planche_charcuterie",
+   "nom": "Planche de charcuterie",
+   "famille": "Planches",
+   "motsCles": [
+    "planche de charcuterie",
+    "planches de charcuterie",
+    "charcuterie de talensac",
+    "planche charcuterie"
+   ],
+   "contenu": [
+    {
+     "code": "P042",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "planche_poisson",
+   "nom": "Planche de poisson fumé",
+   "famille": "Planches",
+   "motsCles": [
+    "planche de poisson",
+    "poisson fume",
+    "planche poisson"
+   ],
+   "contenu": [
+    {
+     "code": "P043",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "planche_vg",
+   "nom": "Planche végétarienne",
+   "famille": "Planches",
+   "motsCles": [
+    "planche vegetarienne",
+    "planche vg",
+    "planches vegetariennes"
+   ],
+   "contenu": [
+    {
+     "code": "P044",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "huitres",
+   "nom": "Huîtres",
+   "famille": "Planches",
+   "motsCles": [
+    "huitres",
+    "huitre"
+   ],
+   "contenu": [
+    {
+     "code": "P045",
+     "qte": 3
+    }
+   ]
+  },
+  {
+   "id": "planches",
+   "nom": "Planches à partager",
+   "famille": "Planches",
+   "motsCles": [
+    "planches a partager",
+    "planche a partager",
+    "planches"
+   ],
+   "contenu": [
+    {
+     "choix": "planches",
+     "qte": 1,
+     "recettes": 2,
+     "principal": true
+    }
+   ]
+  },
+  {
+   "id": "animation_plancha",
+   "nom": "Animation plancha (80 g/pers)",
+   "famille": "Animations",
+   "motsCles": [
+    "animation plancha",
+    "plancha"
+   ],
+   "contenu": [
+    {
+     "choix": "plancha",
+     "qte": 1,
+     "recettes": 1,
+     "principal": true
+    }
+   ]
+  },
+  {
+   "id": "mini_plat_chaud",
+   "nom": "Mini plat chaud (80 g/pers)",
+   "famille": "Animations",
+   "motsCles": [
+    "mini plat chaud",
+    "mini plats chauds",
+    "risotto",
+    "mijote du moment"
+   ],
+   "contenu": [
+    {
+     "choix": "mini_plat",
+     "qte": 1,
+     "recettes": 1,
+     "principal": true
+    }
+   ]
+  },
+  {
+   "id": "brunch",
+   "nom": "Brunch",
+   "famille": "Brunch",
+   "motsCles": [
+    "brunch",
+    "brunchs",
+    "formule brunch"
+   ],
+   "exclusions": [
+    "brunch enfant"
+   ],
+   "contenu": [
+    {
+     "code": "P055",
+     "qte": 3
+    },
+    {
+     "code": "P056",
+     "qte": 1
+    },
+    {
+     "code": "P057",
+     "qte": 1
+    },
+    {
+     "code": "P058",
+     "qte": 1
+    },
+    {
+     "code": "P045",
+     "qte": 2
+    },
+    {
+     "code": "P009",
+     "qte": 1
+    },
+    {
+     "code": "P059",
+     "qte": 1
+    },
+    {
+     "code": "P041",
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Pain Emma",
+      "fournisseur": "Emma",
+      "qte": 40,
+      "unite": "g"
+     },
+     "qte": 1
+    },
+    {
+     "boisson": "chaude",
+     "qte": 1
+    },
+    {
+     "bar": "Crémant",
+     "qte": 1
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "qte": 1
+    }
+   ],
+   "description": "3 mini-viennoiseries, ½ gaufre, verrine fromage blanc, navette saumon, 2 huîtres, mini-croque, charcuterie 30 g, fromages, pain ; boisson chaude, coupe de crémant, jus de pomme.",
+   "absorbe": [
+    "boisson_chaude",
+    "jus_pomme",
+    "huitres",
+    "aperitif"
+   ]
+  },
+  {
+   "id": "brunch_enfant",
+   "nom": "Brunch enfant",
+   "famille": "Brunch",
+   "motsCles": [
+    "brunch enfant",
+    "brunchs enfants",
+    "brunch enfants"
+   ],
+   "contenu": [
+    {
+     "code": "P055",
+     "qte": 1
+    },
+    {
+     "code": "P056",
+     "qte": 1
+    },
+    {
+     "bar": "Chocolat chaud",
+     "qte": 1
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "qte": 1
+    }
+   ],
+   "absorbe": [
+    "boisson_chaude",
+    "jus_pomme"
+   ]
+  },
+  {
+   "id": "menu_enfant",
+   "nom": "Menu enfant",
+   "famille": "Enfants",
+   "motsCles": [
+    "menu enfant",
+    "menus enfant",
+    "menus enfants",
+    "menu enfants"
+   ],
+   "contenu": [
+    {
+     "code": "P040",
+     "qte": 1
+    },
+    {
+     "code": "P054",
+     "qte": 1
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "qte": 1
+    }
+   ],
+   "absorbe": [
+    "glace",
+    "jus_pomme"
+   ]
+  },
+  {
+   "id": "menu_ado",
+   "nom": "Menu ado",
+   "famille": "Enfants",
+   "motsCles": [
+    "menu ado",
+    "menus ado",
+    "menus ados",
+    "menu ados"
+   ],
+   "contenu": [
+    {
+     "code": "P040",
+     "qte": 1.3
+    },
+    {
+     "code": "P054",
+     "qte": 1
+    },
+    {
+     "boisson": "soft",
+     "qte": 1
+    }
+   ],
+   "absorbe": [
+    "glace",
+    "jus_pomme",
+    "soft"
+   ]
+  },
+  {
+   "id": "mignardises",
+   "nom": "Mignardises Honoré",
+   "famille": "Desserts",
+   "motsCles": [
+    "mignardises",
+    "mignardise",
+    "reductions sucrees"
+   ],
+   "contenu": [
+    {
+     "code": "P051",
+     "qte": 3
+    }
+   ]
+  },
+  {
+   "id": "grand_gateau",
+   "nom": "Grand gâteau Honoré",
+   "famille": "Desserts",
+   "motsCles": [
+    "grand gateau",
+    "grands gateaux",
+    "gateau honore",
+    "picasso",
+    "fraisier",
+    "framboisier",
+    "trois chocolat",
+    "karanougat",
+    "symphonie",
+    "caraibe"
+   ],
+   "remplaceChoix": {
+    "famille": "dessert",
+    "code": "P052",
+    "parUnite": 1
+   },
+   "contenu": [
+    {
+     "code": "P052",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "piece_montee",
+   "nom": "Pièce montée Emma (3 choux/pers)",
+   "famille": "Desserts",
+   "motsCles": [
+    "piece montee",
+    "pieces montees",
+    "choux emma"
+   ],
+   "remplaceChoix": {
+    "famille": "dessert",
+    "code": "P053",
+    "parUnite": 3
+   },
+   "contenu": [
+    {
+     "code": "P053",
+     "qte": 3
+    }
+   ]
+  },
+  {
+   "id": "glace",
+   "nom": "Glace artisanale Jampi",
+   "famille": "Desserts",
+   "motsCles": [
+    "glace jampi",
+    "glace artisanale",
+    "glaces"
+   ],
+   "contenu": [
+    {
+     "code": "P054",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "forfait_boissons",
+   "nom": "Forfait boissons",
+   "famille": "Boissons",
+   "motsCles": [
+    "forfait boissons",
+    "forfait boisson",
+    "forfaits boissons",
+    "forfaits boisson"
+   ],
+   "contenu": [
+    {
+     "boisson": "alcool",
+     "qte": 3,
+     "boissonsDepuisTexte": true,
+     "label": "Verres d'alcool (crémant, vins, bière)"
+    },
+    {
+     "boisson": "sans_alcool_ou_chaude",
+     "qte": 1
+    }
+   ],
+   "description": "N verres d'alcool (nombre lu dans le libellé, 3 par défaut) + 1 boisson sans alcool ou chaude.",
+   "cedeA": [
+    "verre_vin",
+    "aperitif"
+   ],
+   "absorbe": [
+    "soft",
+    "boisson_chaude",
+    "jus_pomme"
+   ]
+  },
+  {
+   "id": "verre_vin",
+   "nom": "Verre de vin",
+   "famille": "Boissons",
+   "motsCles": [
+    "verre de vin",
+    "1 verre de vin",
+    "verres de vin"
+   ],
+   "contenu": [
+    {
+     "boisson": "vin",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "aperitif",
+   "nom": "Apéritif / verre de clôture",
+   "famille": "Boissons",
+   "motsCles": [
+    "aperitif",
+    "verre de cloture",
+    "vin d honneur",
+    "coupe de cremant",
+    "kir"
+   ],
+   "exclusions": [
+    "aperitif dinatoire"
+   ],
+   "contenu": [
+    {
+     "boisson": "aperitif",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "boisson_chaude",
+   "nom": "Boisson chaude",
+   "famille": "Boissons",
+   "motsCles": [
+    "boisson chaude",
+    "boissons chaudes",
+    "1 cafe",
+    "cafe the",
+    "cafe / the"
+   ],
+   "contenu": [
+    {
+     "boisson": "chaude",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "jus_pomme",
+   "nom": "Jus de pomme bio",
+   "famille": "Boissons",
+   "motsCles": [
+    "jus de pomme"
+   ],
+   "contenu": [
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "forfait_sans_alcool",
+   "nom": "Forfait sans alcool",
+   "famille": "Boissons",
+   "motsCles": [
+    "forfait sans alcool",
+    "forfaits sans alcool"
+   ],
+   "contenu": [
+    {
+     "bar": "Cocktail sans alcool",
+     "qte": 1
+    },
+    {
+     "boisson": "soft",
+     "qte": 2
+    }
+   ],
+   "absorbe": [
+    "soft",
+    "mocktail"
+   ]
+  },
+  {
+   "id": "soft",
+   "nom": "Soft",
+   "famille": "Boissons",
+   "motsCles": [
+    "soft",
+    "softs",
+    "boisson sans alcool",
+    "boissons sans alcool",
+    "boisson fraiche"
+   ],
+   "contenu": [
+    {
+     "boisson": "soft",
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "cocktail_spritz",
+   "nom": "Cocktail Spritz / Hugo / Mojito",
+   "famille": "Boissons",
+   "motsCles": [
+    "spritz",
+    "hugo",
+    "mojito",
+    "cocktail signature",
+    "cocktails signature"
+   ],
+   "exclusions": [
+    "virgin"
+   ],
+   "contenu": [
+    {
+     "achat": {
+      "produit": "Bulles de l'Ouest (Spritz)",
+      "fournisseur": "Braud",
+      "qte": 6,
+      "unite": "cl"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Liqueur Giffard (Spritz / sureau)",
+      "fournisseur": "Vito",
+      "qte": 5,
+      "unite": "cl"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Eau gazeuse (cocktails)",
+      "fournisseur": "Fourgon",
+      "qte": 4,
+      "unite": "cl"
+     },
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "mocktail",
+   "nom": "Mocktail (Virgin Spritz / Hugo)",
+   "famille": "Boissons",
+   "motsCles": [
+    "mocktail",
+    "mocktails",
+    "virgin",
+    "cocktail sans alcool"
+   ],
+   "contenu": [
+    {
+     "achat": {
+      "produit": "Liqueur sans alcool Giffard",
+      "fournisseur": "Vito",
+      "qte": 5,
+      "unite": "cl"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Eau gazeuse (cocktails)",
+      "fournisseur": "Fourgon",
+      "qte": 10,
+      "unite": "cl"
+     },
+     "qte": 1
+    }
+   ]
+  },
+  {
+   "id": "hors_cuisine",
+   "nom": "Hors cuisine (location, frais…)",
+   "famille": "Hors cuisine",
+   "horsCuisine": true,
+   "motsCles": [
+    "location",
+    "privatisation",
+    "frais de dossier",
+    "salon",
+    "salons",
+    "videoprojecteur",
+    "wifi",
+    "whiteboard",
+    "tableau blanc",
+    "heure supplementaire",
+    "heures supplementaires",
+    "remise",
+    "dj",
+    "photobooth",
+    "sono",
+    "nappage",
+    "vestiaire",
+    "acompte",
+    "caution",
+    "eau a disposition",
+    "eau osmosee",
+    "atelier",
+    "ateliers",
+    "animation musicale",
+    "deco",
+    "decoration",
+    "frais de service"
+   ]
+  }
+ ],
+ "choix": {
+  "salees_cocktail": {
+   "label": "Pièces salées au choix du chef",
+   "recettes": 8,
+   "categories": [
+    "Pièce cocktail — mer",
+    "Pièce cocktail — ferme",
+    "Pièce cocktail — jardin",
+    "Pièce cocktail — estivale"
+   ],
+   "saison": {
+    "Pièce cocktail — estivale": [
+     6,
+     7,
+     8,
+     9
+    ]
+   }
+  },
+  "speciales": {
+   "label": "Pièce spéciale",
+   "recettes": 1,
+   "categories": [
+    "Pièce spéciale"
+   ]
+  },
+  "navettes": {
+   "label": "Navettes briochées",
+   "recettes": 2,
+   "codes": [
+    "P002",
+    "P006",
+    "P058"
+   ]
+  },
+  "entree": {
+   "label": "Entrée du chef",
+   "recettes": 1,
+   "categories": [
+    "Entrée"
+   ]
+  },
+  "plat": {
+   "label": "Plat du chef",
+   "recettes": 1,
+   "categories": [
+    "Plat"
+   ],
+   "exclure": [
+    "P033"
+   ]
+  },
+  "dessert": {
+   "label": "Dessert",
+   "recettes": 1,
+   "codes": [
+    "P051",
+    "P052",
+    "P053",
+    "P054"
+   ],
+   "portionsParCode": {
+    "P051": 3,
+    "P052": 1,
+    "P053": 3,
+    "P054": 1
+   }
+  },
+  "plancha": {
+   "label": "Animation plancha",
+   "recettes": 1,
+   "categories": [
+    "Animation plancha"
+   ]
+  },
+  "mini_plat": {
+   "label": "Mini plat chaud",
+   "recettes": 1,
+   "categories": [
+    "Mini plat chaud"
+   ]
+  },
+  "planches": {
+   "label": "Planches à partager",
+   "recettes": 2,
+   "categories": [
+    "Planche ou plateau"
+   ]
+  }
+ },
+ "typePlats": {
+  "P029": "poisson",
+  "P030": "poisson",
+  "P031": "vegetarien",
+  "P032": "viande",
+  "P033": "halal",
+  "P034": "viande",
+  "P035": "viande",
+  "P036": "viande"
+ },
+ "achatsDirects": {
+  "P041": {
+   "produit": "Fromages (plateau Beillevaire)",
+   "fournisseur": "Fromagerie Pascal Beillevaire",
+   "qte": 50,
+   "unite": "g",
+   "note": "50 g/pers en cocktail convivial ; 70 g pour le nouveau plateau"
+  },
+  "P042": {
+   "produit": "Charcuterie de Talensac",
+   "fournisseur": "La Jambonnerie Nantaise (Talensac)",
+   "qte": 50,
+   "unite": "g"
+  },
+  "P043": {
+   "produit": "Poisson fumé (planche)",
+   "fournisseur": "Maison Berjac",
+   "qte": 50,
+   "unite": "g",
+   "note": "fournisseur à confirmer"
+  },
+  "P045": {
+   "produit": "Huîtres",
+   "fournisseur": "Maison Berjac",
+   "qte": 1,
+   "unite": "pièce",
+   "note": "fournisseur à confirmer"
+  },
+  "P051": {
+   "produit": "Mignardises",
+   "fournisseur": "Honoré",
+   "qte": 1,
+   "unite": "pièce"
+  },
+  "P052": {
+   "produit": "Grand gâteau (parts)",
+   "fournisseur": "Honoré",
+   "qte": 1,
+   "unite": "part"
+  },
+  "P053": {
+   "produit": "Choux pour pièce montée",
+   "fournisseur": "Emma",
+   "qte": 1,
+   "unite": "chou"
+  },
+  "P054": {
+   "produit": "Glaces artisanales",
+   "fournisseur": "Maison Jampi",
+   "qte": 1,
+   "unite": "pot"
+  },
+  "P059": {
+   "produit": "Charcuterie italienne (chiffonnade)",
+   "fournisseur": "La Jambonnerie Nantaise (Talensac)",
+   "qte": 30,
+   "unite": "g",
+   "note": "fournisseur à confirmer"
+  }
+ },
+ "boissons": {
+  "chaude": {
+   "label": "Boisson chaude",
+   "repartition": [
+    {
+     "bar": "Café Cime",
+     "part": 0.75
+    },
+    {
+     "bar": "Thé",
+     "part": 0.25
+    }
+   ]
+  },
+  "pause": {
+   "label": "Boisson de pause (chaude ou fraîche)",
+   "repartition": [
+    {
+     "bar": "Café Cime",
+     "part": 0.5
+    },
+    {
+     "bar": "Thé",
+     "part": 0.15
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "part": 0.2
+    },
+    {
+     "bar": "Eau gazeuse Plancoët",
+     "part": 0.15
+    }
+   ]
+  },
+  "vin": {
+   "label": "Verre de vin",
+   "repartition": [
+    {
+     "bar": "Muscadet",
+     "part": 0.5
+    },
+    {
+     "bar": "Rouge local léger",
+     "part": 0.5
+    }
+   ]
+  },
+  "alcool": {
+   "label": "Verres d'alcool (forfait)",
+   "repartition": [
+    {
+     "bar": "Crémant",
+     "part": 0.34
+    },
+    {
+     "bar": "Muscadet",
+     "part": 0.22
+    },
+    {
+     "bar": "Rouge local léger",
+     "part": 0.22
+    },
+    {
+     "bar": "Bière artisanale",
+     "part": 0.22
+    }
+   ]
+  },
+  "aperitif": {
+   "label": "Apéritif",
+   "repartition": [
+    {
+     "bar": "Crémant",
+     "part": 1
+    }
+   ]
+  },
+  "sans_alcool_ou_chaude": {
+   "label": "Boisson sans alcool ou chaude",
+   "repartition": [
+    {
+     "bar": "Café Cime",
+     "part": 0.4
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "part": 0.3
+    },
+    {
+     "bar": "Breizh Cola",
+     "part": 0.15
+    },
+    {
+     "bar": "Eau gazeuse Plancoët",
+     "part": 0.15
+    }
+   ]
+  },
+  "soft": {
+   "label": "Soft",
+   "repartition": [
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "part": 0.4
+    },
+    {
+     "bar": "Breizh Cola",
+     "part": 0.3
+    },
+    {
+     "bar": "Limonade",
+     "part": 0.3
+    }
+   ]
+  }
+ },
+ "barDefauts": {
+  "Crémant": {
+   "verresParBouteille": 6,
+   "verreCl": 12,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Muscadet": {
+   "verresParBouteille": 6,
+   "verreCl": 12.5,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Blanc sudiste gourmand": {
+   "verresParBouteille": 6,
+   "verreCl": 12.5,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Rouge local léger": {
+   "verresParBouteille": 6,
+   "verreCl": 12.5,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Rouge sudiste gourmand": {
+   "verresParBouteille": 6,
+   "verreCl": 12.5,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Rosé de saison": {
+   "verresParBouteille": 6,
+   "verreCl": 12.5,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
+  },
+  "Bière artisanale": {
+   "verresParBouteille": 1,
+   "verreCl": 33,
+   "contenant": "bouteille",
+   "fournisseur": "Vito"
+  },
+  "Breizh Cola": {
+   "verresParBouteille": 1,
+   "contenant": "bouteille",
+   "fournisseur": "Vito"
+  },
+  "Limonade": {
+   "verresParBouteille": 3,
+   "verreCl": 25,
+   "contenant": "bouteille",
+   "fournisseur": "Vito"
+  },
+  "Eau gazeuse Plancoët": {
+   "verresParBouteille": 4,
+   "verreCl": 25,
+   "contenant": "bouteille",
+   "fournisseur": "Vito"
+  },
+  "Eau plate Plancoët": {
+   "verresParBouteille": 4,
+   "verreCl": 25,
+   "contenant": "bouteille",
+   "fournisseur": "Vito"
+  },
+  "Jus de pomme bio des Coteaux Nantais": {
+   "verresParBouteille": 25,
+   "verreCl": 20,
+   "contenant": "BIB 5 L",
+   "fournisseur": "La fourche"
+  },
+  "Cocktail sans alcool": {
+   "verresParBouteille": 1,
+   "contenant": "verre",
+   "fournisseur": "Production maison"
+  },
+  "Sirop": {
+   "verresParBouteille": 35,
+   "verreCl": 2,
+   "contenant": "bouteille 70 cl",
+   "fournisseur": "Vito"
+  },
+  "Café Cime": {
+   "parVerre": 8,
+   "uniteParVerre": "g",
+   "produit": "Café en grains Cime",
+   "fournisseur": "Cime"
+  },
+  "Thé": {
+   "parVerre": 1,
+   "uniteParVerre": "sachet",
+   "produit": "Thé (sachets)",
+   "fournisseur": "Maison Berjac"
+  },
+  "Chocolat chaud": {
+   "parVerre": 25,
+   "uniteParVerre": "g",
+   "produit": "Chocolat en poudre",
+   "fournisseur": "Maison Berjac"
+  }
+ },
+ "livraisonJourJ": [
+  "emma",
+  "honore"
+ ],
+ "fournisseursInfos": {
+  "fromagerie-pascal-beillevaire": {
+   "nom": "Fromagerie Pascal Beillevaire",
+   "site": "https://fromagerie-beillevaire.com/",
+   "modeCommande": "Téléphone  (9h-17h), formulaire contact, contact@beillevaire.com ; activité 'marchand' déclarée vers hôtellerie/restauration",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "les-jardins-de-st-hilaire": {
+   "nom": "Les Jardins de St-Hilaire",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "la-ferme-du-bois-des-anses": {
+   "nom": "La Ferme du Bois des Anses",
+   "modeCommande": "Contact direct avec la productrice (pas de site ni boutique en ligne trouvés)",
+   "source": "recherche web du 26/11/2026 (confiance medium)"
+  },
+  "damien-rio": {
+   "nom": "Damien Rio",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "maison-de-la-pomme-talensac": {
+   "nom": "Maison de la pomme (Talensac)",
+   "modeCommande": "Contact direct producteur / sur le marché",
+   "source": "recherche web du 26/11/2026 (confiance medium)"
+  },
+  "maison-berjac": {
+   "nom": "Maison Berjac",
+   "site": "https://www.berjac.fr/",
+   "sitePro": "https://www.berjac.fr/nos-gammes-2/",
+   "modeCommande": "Ouverture de compte pro (tél. ou formulaire), puis commande via l'appli OrderLion ou par téléphone auprès du commercial attitré. Standard",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "palmiloire": {
+   "nom": "Palmiloire",
+   "site": "https://palmiloire.fr/",
+   "sitePro": "https://palmiloire.fr/produits/",
+   "modeCommande": "Site (commande en ligne), téléphone , contact@palmiloire.fr ; magasin sur place",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "la-jambonnerie-nantaise-talensac": {
+   "nom": "La Jambonnerie Nantaise (Talensac)",
+   "source": "recherche web du 26/11/2026 (confiance medium)"
+  },
+  "saveurs-du-cachemire": {
+   "nom": "Saveurs du Cachemire",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "sdpf-bouzat": {
+   "nom": "SDPF - Bouzat",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "emma": {
+   "nom": "Emma",
+   "site": "https://www.emma-patisserie.fr/",
+   "modeCommande": "Commande en ligne par boutique sur le site (grand public) ; contact via https://www.emma-patisserie.fr/contactez-nous",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "honore": {
+   "nom": "Honoré",
+   "modeCommande": "Téléphone / en boutique",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "cime": {
+   "nom": "Cime",
+   "site": "https://www.cime-cafe.fr/",
+   "sitePro": "https://www.cime-cafe.fr/le-service-personnalise-des-pros",
+   "modeCommande": "Excel : SMS. Site : rubrique Professionnels / contact ; boutique en ligne grand public + abonnement",
+   "infoDelai": "Torréfaction à la demande ; conseil de consommer sous 45 jours après torréfaction (Excel : 1-2 j)",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "maison-meneau": {
+   "nom": "Maison Meneau",
+   "site": "https://www.meneau.com/",
+   "sitePro": "https://pro.meneau.com/",
+   "modeCommande": "Espace MENEAU PRO en ligne 24h/24 (compte validé sous 48 h ouvrées sur Kbis) ; ADV : adv@meneau.com,  (Excel : mail)",
+   "infoDelai": "Environ 3-5 jours ouvrés (Excel : 4-7 jours)",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "la-fourche": {
+   "nom": "La fourche",
+   "site": "https://lafourche.fr/",
+   "modeCommande": "Site/appli avec compte adhérent (essai 30 j puis adhésion payante) ; Excel : mail",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "vito": {
+   "nom": "Vito",
+   "source": "recherche web du 26/11/2026 (confiance medium)"
+  },
+  "filles-de-l-ouest": {
+   "nom": "Filles de l'Ouest",
+   "site": "https://lesfillesdelouest.com/",
+   "sitePro": "https://www.ankorstore.com/brand/les-filles-de-louest-1135",
+   "modeCommande": "Compte professionnel sur le site (validation sous 24 h), contact@lesfillesdelouest.com,  ; aussi grossiste via Ankorstore",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "maison-jampi": {
+   "nom": "Maison Jampi",
+   "site": "https://www.jampiglacier.com/",
+   "sitePro": "https://www.jampiglacier.com/professionels",
+   "modeCommande": "Formulaire de contact professionnel, pro@jampiglacier.com,  (lun-ven 9h-12h / 14h-17h)",
+   "infoDelai": "Retrait en point partenaire : min. 4 jours après commande (hors week-end) - offre grand public",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "biscuiterie-armor": {
+   "nom": "Biscuiterie Armor",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "la-sablesienne": {
+   "nom": "La Sablésienne",
+   "site": "https://www.sablesienne.com/fr/",
+   "sitePro": "https://www.ankorstore.com/brand/la-sablesienne-3047",
+   "modeCommande": "Site (boutique en ligne + 'Espace entreprise'), contact@sablesienne.com,  ; grossistes Ankorstore / Faire",
+   "infoDelai": "Via Ankorstore : expédition 6 à 10 jours",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "pause-saumon": {
+   "nom": "Pause Saumon",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "conserverie-gonidec": {
+   "nom": "Conserverie Gonidec",
+   "site": "https://www.gonidec.com/",
+   "modeCommande": "Site = vente aux particuliers uniquement ; pros : devis (acompte 30 %, devis valable 1 mois) via contact@gonidec.com /",
+   "source": "recherche web du 26/11/2026 (confiance high)"
+  },
+  "simone-potager": {
+   "nom": "Simone potager",
+   "sitePro": "https://tally.so/r/wvxRQm",
+   "modeCommande": "Formulaire de devis en ligne (Tally)",
+   "source": "recherche web du 26/11/2026 (confiance low)"
+  },
+  "coup-de-pates": {
+   "nom": "coup de pates",
+   "site": "https://www.coupdepates.fr/",
+   "sitePro": "https://shop.coupdepates.fr/",
+   "modeCommande": "E-shop clients 24/7 (shop.coupdepates.fr), téléphone, e-mail, commercial terrain ou centre d'appels (280 commerciaux) ; ouverture de compte via formulaire ou pl",
+   "infoDelai": "Veille du jour de livraison avant 12h (CGV) - la FAQ e-shop indique 15h",
+   "source": "recherche web du 26/11/2026 (confiance high)",
+   "delai": "24 h",
+   "heureLimite": "la veille avant 12h (CGV e-shop)"
+  }
+ }
+}
