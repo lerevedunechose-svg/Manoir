@@ -312,7 +312,7 @@
      "code": "P051",
      "qte": 4,
      "label": "Mignardises Honoré",
-     "qteDepuisTexte": "(?:pieces? sucrees?|mignardises?)",
+     "qteDepuisTexte": "(?:(?:pieces? )?sucrees?|mignardises?)",
      "sucre": true,
      "qteMax": 8,
      "qteSelonTexte": [
@@ -1281,7 +1281,7 @@
     {
      "boisson": "soft",
      "qte": 2,
-     "boissonsDepuisTexte": "(?:boissons?|softs?)(?! chaudes?)",
+     "boissonsDepuisTexte": "(?:boissons?|softs?)\\b(?! chaudes?)",
      "qteMax": 4
     }
    ],
@@ -2156,5 +2156,73 @@
    "delai": "24 h",
    "heureLimite": "la veille avant 12h (CGV e-shop)"
   }
+ },
+ "statsChoix": {
+  "P051": 68,
+  "P052": 48,
+  "P053": 42,
+  "P001": 41,
+  "P006": 40,
+  "P029": 35,
+  "P008": 32,
+  "P012": 32,
+  "P014": 32,
+  "P005": 30,
+  "P032": 30,
+  "P007": 29,
+  "P004": 28,
+  "P025": 27,
+  "P009": 24,
+  "P003": 23,
+  "P002": 22,
+  "P018": 22,
+  "P010": 21,
+  "P015": 20,
+  "P034": 17,
+  "P031": 15,
+  "P011": 14,
+  "P024": 12,
+  "P026": 12,
+  "P017": 10,
+  "P016": 8,
+  "P019": 8,
+  "P013": 7,
+  "P028": 7,
+  "P020": 5,
+  "P033": 4,
+  "P022": 3,
+  "P021": 2,
+  "P023": 2,
+  "P027": 2,
+  "P035": 2,
+  "P036": 2,
+  "P030": 1
+ },
+ "activite": {
+  "source": "Analyse du 26/11/2026 : 529 devis et fiches de fonction lus, 2 031 titres 2024-2027 (statistiques agrégées, sans nom de client).",
+  "parMois": {
+   "2025-12": 39,
+   "2026-01": 19,
+   "2026-02": 22,
+   "2026-03": 33,
+   "2026-04": 26,
+   "2026-05": 36,
+   "2026-06": 46,
+   "2026-07": 23,
+   "2026-08": 15,
+   "2026-09": 34,
+   "2026-10": 43,
+   "2026-11": 25
+  },
+  "resume": "Environ 363 événements par an (383 en 2024, 343 en 2025). Mois les plus chargés : juin, mai, septembre, novembre ; plus calmes : février, janvier, août.",
+  "faits": [
+   "Le samedi porte 31 % des événements, le jeudi 18 %.",
+   "20 convives en médiane, 52 pour les plus gros (9 sur 10 en dessous) ; 41 % de particuliers.",
+   "Pièces par personne constatées : 3 en mises en bouche, 11 en cocktail Procé, 14 en cocktail déjeunatoire.",
+   "Un forfait boissons dans 52 % des événements, 3 consommations par personne en médiane.",
+   "36 % des événements comptent au moins un végétarien, une allergie ou un halal (végétariens 20 %, allergies 20 %).",
+   "La fiche de fonction arrive 10 jours avant en médiane, mais seulement 3,5 jours avant pour 1 événement sur 10.",
+   "Entre devis et fiche de fonction, le nombre de convives baisse dans 5 cas sur 26 (jusqu’à 36 %) : commander sur la fiche de fonction."
+  ]
  }
 }

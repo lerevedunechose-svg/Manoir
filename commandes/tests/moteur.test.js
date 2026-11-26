@@ -747,6 +747,8 @@ test('R2 : « 5 pièces salées + 2 sucrées » garde les 2 sucrées', () => {
   assert.strictEqual(ps.find(p => p.ref && p.ref.code === 'P051').parConvive, 2);
   const ps2 = postesDe(devis(['Formule apéritive : 3 pièces salées + 2 sucrées 20,00 9,00 € 180,00 € 10,00%'], 20));
   assert.strictEqual(ps2.find(p => p.ref && p.ref.code === 'P051').parConvive, 2);
+  const c = postesDe(fiche(['RESTAURATION', '30 cocktails dînatoires 11 pièces salées + 2 sucrées'], 30));
+  assert.strictEqual(c.find(p => p.ref && p.ref.code === 'P051').parConvive, 2);
   // sans sucrées écrites : rien en plus
   assert.ok(!postesDe(fiche(['RESTAURATION', '30 menus Procé', "3 pièces salées à l'apéritif"], 30)).some(p => p.forfait === 'mises_en_bouche' && p.ref));
 });

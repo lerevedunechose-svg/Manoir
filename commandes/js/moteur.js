@@ -197,7 +197,7 @@
     return deIso(x);
   }
   // mots suivis d'un numéro qui n'est pas un jour (« Salle 2 », « Option 1 », « Table 4 ») : jamais le début d'une liste de dates
-  const NOMS_NUMERO = /^(?:salle|salles|salon|salons|option|options|table|tables|lot|lots|etage|niveau|groupe|groupes|formule|formules|menu|menus|n|no|num|numero|ref|reference|version|v|zone|espace|chambre|chambres|bus|car|atelier|ateliers|session|sessions|module|modules|jour|jours|tarif|prix|devis|lieu|batiment|bloc|porte|tranche|categorie|tente|stand|equipe|equipes)$/;
+  const NOMS_NUMERO = /^(?:salle|salles|salon|salons|option|options|table|tables|lot|lots|etage|niveau|groupe|groupes|formule|formules|menu|menus|n|no|num|numero|ref|reference|version|v|zone|espace|chambre|chambres|bus|car|atelier|ateliers|session|sessions|module|modules|tarif|prix|devis|lieu|batiment|bloc|porte|tranche|categorie|tente|stand|equipe|equipes)$/;
   /**
    * Dates écrites en français dans un texte : « Vendredi 11 décembre 2026 », « 4 + 5 + 6 février 2027 »,
    * « 4, 5 et 6 février », « 4/5/6 février », « du 4 au 6 février », « mardi 1er et mercredi 2 décembre », « 03/12/2026 ».
@@ -246,7 +246,7 @@
         debut--;
       }
       // « Option 1 - 5 décembre » : un numéro collé à un nom n'ouvre pas la liste
-      if (debut < elems.length - 1 && !elems[debut].nomJour) {
+      if (debut === 0 && elems.length > 1 && !elems[0].nomJour) {
         const avant = t.slice(0, m.index + m[1].length).trim().split(' ').pop() || '';
         if (NOMS_NUMERO.test(avant.replace(/[^a-z]/g, ''))) debut++;
       }
