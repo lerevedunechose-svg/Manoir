@@ -188,3 +188,24 @@ test('apprentissage : alias de libellé prioritaire, coefficient borné', () => 
   assert.strictEqual(c.coef, 1.6);
   c = M.ajusterCoefficient(null, 'trop'); assert.strictEqual(c.coef, 0.92);
 });
+
+test('forfaits boissons : générique ou détail explicite', () => {
+  const ids = t => M.detecterForfaits(t, idx).map(x => x.id).sort();
+  assert.deepStrictEqual(ids('Forfait boissons 3 verres + 1 boisson chaude'), ['forfait_boissons']);
+  assert.deepStrictEqual(ids('Forfait boissons (1 verre de vin + 1 boisson chaude) pendant le déjeuner'), ['boisson_chaude', 'verre_vin']);
+  assert.deepStrictEqual(ids('Mises en bouche (4 par personne)'), ['mises_en_bouche']);
+  assert.deepStrictEqual(ids('Cocktail sans alcool'), ['mocktail']);
+});
+
+test('fournisseur à long délai : une seule livraison dans la semaine', () => {
+  const f1 = M.lireDocument(DEVIS_JOURNEE.replace('11 décembre', '1 décembre'), 'Devis Manoir de Procé - 011226 - A.pdf', idx);
+  const f2 = M.lireDocument(DEVIS_JOURNEE.replace('11 décembre', '3 décembre'), 'Devis Manoir de Procé - 031226 - B.pdf', idx);
+  const evs = [f1, f2].map(f => ({ fiche: f, jour: f.jours[0], postes: M.developperJour(f, f.jours[0], idx) }));
+  const cmd = M.calculerCommandes(M.calculerBesoins(evs, idx, {}), idx, {}, { maintenant: new Date(2026, 10, 20, 9) });
+  const fourche = cmd.bons.find(b => b.slug === 'la-fourche');
+  assert.strictEqual(fourche.livraisons.length, 1, 'La Fourche (10 jours) : une livraison');
+  const jus = fourche.livraisons[0].lignes.find(l => /Jus de pomme/.test(l.produit));
+  assert.strictEqual(new Set(jus.pour.map(p => p.client)).size, 2, 'les deux services sont regroupés sur la même ligne');
+  const berjac = cmd.bons.find(b => b.slug === 'maison-berjac');
+  assert.ok(berjac.livraisons.length >= 1);
+});
