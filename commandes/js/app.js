@@ -857,7 +857,10 @@ ${texte.slice(0, 16000)}
       jours.appendChild(bloc);
     });
     t.appendChild(jours);
-    if ((f.remarques || []).length) t.appendChild(h('details', { style: { marginTop: '10px' } }, h('summary', { class: 'note' }, 'Remarques du document'), h('ul', { class: 'note' }, f.remarques.map(r => h('li', null, r)))));
+    // les remarques ⚠ du moteur (date ajoutée, convives introuvables…) restent visibles ; les autres se replient
+    (f.remarques || []).filter(r => /^\s*⚠/.test(r)).forEach(r => t.appendChild(h('div', { class: 'alerte', style: { marginTop: '6px' } }, r)));
+    const autres = (f.remarques || []).filter(r => !/^\s*⚠/.test(r));
+    if (autres.length) t.appendChild(h('details', { style: { marginTop: '10px' } }, h('summary', { class: 'note' }, 'Remarques du document'), h('ul', { class: 'note' }, autres.map(r => h('li', null, r)))));
     return t;
   }
   function blocPrestation(f, p) {
@@ -922,6 +925,9 @@ ${texte.slice(0, 16000)}
       h('div', { class: 'service-tete' }, h('h3', null, e.fiche.client), h('span', { class: 'note' }, [e.jour.convives ? e.jour.convives + ' convives' : null, e.fiche.horaires].filter(Boolean).join(' · '))));
     if ((e.fiche.regimes || []).length) s.appendChild(h('div', { class: 'regimes' }, e.fiche.regimes.slice(0, 3).join(' · ')));
     if (!e.postes.length) { s.appendChild(h('div', { class: 'note' }, 'Rien à produire pour ce service (location, frais…).')); return s; }
+    if (e.postes.some(p => p.convivesInconnus)) s.appendChild(h('div', { class: 'alerte' }, '⚠ Nombre de convives introuvable : saisissez-le sur la fiche (étape 1), sinon rien n’est commandé pour ce service.'));
+    const avert = Array.from(new Set(e.postes.flatMap(p => p.avertissements || [])));
+    avert.forEach(a => s.appendChild(h('div', { class: 'alerte' }, '⚠ ', a)));
     const fixes = e.postes.filter(p => p.type === 'fixe');
     e.postes.filter(p => p.type === 'choix').forEach(p => s.appendChild(blocChoix(p)));
     if (fixes.length) {
@@ -1121,12 +1127,14 @@ Réponds uniquement en JSON : [{"index":0,"quantite":1.5}]`, { modelTier: 'quick
           h('td', null, l.produit, l.coef !== 1 ? h('span', { class: 'note' }, ' ×' + l.coef) : null, l.vpbDefaut ? h('span', { class: 'note' }, ' (' + l.verresParBouteille + ' verres/bout.)') : null),
           h('td', { class: 'qte col-sec' }, M.formatQte(l.besoin, l.base)),
           h('td', { class: 'qte col-sec' }, l.stock > 0 ? '−' + M.formatQte(l.stock, l.base) : ''),
-          h('td', { class: 'qte fort' }, l.aCommander > 0 ? qteCommande(l) : 'en stock')));
+          h('td', { class: 'qte fort' }, l.aCommander > 0 ? qteCommande(l) : (l.fond && l.reserve ? 'sur la réserve' : 'en stock'))));
       });
       const texte = texteBon(b, liv);
       t.appendChild(h('div', { class: 'livraison' },
         h('div', { class: 'livraison-tete' }, h('span', null, 'Livraison ' + M.jourLong(liv.date).toLowerCase()),
-          h('span', { class: 'puce ' + ul[0], title: liv.delaiConnu ? '' : 'délai par défaut : 48 h' }, 'commander avant ' + dateHeure(liv.limite))),
+          liv.fond ? h('span', { class: 'puce neutre', title: 'Café, thé, jus en BIB… : vérifiez la réserve avant de commander' }, 'produits de fond') : null,
+          liv.reportee ? h('span', { class: 'puce attention', title: 'L’heure limite de la première livraison est passée : la réserve doit couvrir jusque-là' }, 'reportée') : null,
+          h('span', { class: 'puce ' + ul[0], title: [liv.delaiConnu ? '' : 'délai par défaut : 48 h', liv.heureFixe ? 'heure limite du fournisseur' : ''].filter(Boolean).join(' · ') }, 'commander avant ' + dateHeure(liv.limite))),
         h('div', { class: 'tableau-wrap' }, h('table', null, h('thead', null, h('tr', null, h('th', null, 'Produit'), h('th', { class: 'qte col-sec' }, 'Besoin'), h('th', { class: 'qte col-sec' }, 'Stock'), h('th', { class: 'qte' }, 'À commander'))), tb)),
         liv.total ? h('div', { class: 'actions' }, h('button', { class: 'btn fantome petit', type: 'button', onclick: () => copier(texte) }, 'Copier le message de commande')) : null));
     });

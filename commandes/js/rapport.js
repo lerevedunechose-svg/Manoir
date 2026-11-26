@@ -95,7 +95,7 @@
         if (yy > 250) { doc.addPage(); yy = 20; }
         doc.setFillColor.apply(doc, PALE); doc.roundedRect(marge, yy - 4.5, L - 2 * marge, 7.5, 1.2, 1.2, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
-        doc.text(t('Livraison ' + M.jourLong(liv.date).toLowerCase()), marge + 2, yy + 0.5);
+        doc.text(t('Livraison ' + M.jourLong(liv.date).toLowerCase() + (liv.fond ? ' - produits de fond, vérifier la réserve' : '') + (liv.reportee ? ' (reportée)' : '')), marge + 2, yy + 0.5);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
         const lim = 'Commander avant ' + M.jourCourt(M.iso(liv.limite)) + ' ' + heure(liv.limite);
         doc.setTextColor.apply(doc, liv.urgence === 'retard' || liv.urgence === 'aujourdhui' ? [184, 67, 42] : ENCRE);
@@ -106,7 +106,7 @@
           head: [['', 'Produit', 'Besoin', 'Stock', 'A commander', 'Pour']],
           body: liv.lignes.map(l => [
             '', t(l.produit + (l.coef !== 1 ? ' (x' + l.coef + ')' : '')), t(M.formatQte(l.besoin, l.base)), l.stock > 0 ? t('-' + M.formatQte(l.stock, l.base)) : '',
-            l.aCommander > 0 ? t(l.colis && l.conditionnement ? l.colis + ' x ' + l.conditionnement : M.formatQte(l.aCommander, l.base) + (l.verres ? ' (' + Math.round(l.verres) + ' verres)' : '')) : 'en stock',
+            l.aCommander > 0 ? t(l.colis && l.conditionnement ? l.colis + ' x ' + l.conditionnement : M.formatQte(l.aCommander, l.base) + (l.verres ? ' (' + Math.round(l.verres) + ' verres)' : '')) : (l.fond && l.reserve ? t('sur la réserve') : 'en stock'),
             t(Array.from(new Set(l.pour.map(x => x.client))).join(', ')),
           ]),
           columnStyles: { 0: { cellWidth: 7 }, 1: { cellWidth: 55 }, 2: { halign: 'right', cellWidth: 22 }, 3: { halign: 'right', cellWidth: 18 }, 4: { halign: 'right', fontStyle: 'bold', cellWidth: 34 }, 5: { fontSize: 7.5, textColor: GRIS } },
