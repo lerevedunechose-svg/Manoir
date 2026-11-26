@@ -30,7 +30,15 @@ heure limite = livraison 8 h − délai de commande (48 h si non renseigné, sig
 
 - Les pièces sans grammages dans le classeur ne sont **pas** commandées : elles apparaissent dans *À compléter* (écran Bons et dernière page du PDF).
 - Quelques produits s'achètent tout faits (mignardises Honoré, pièces montées Emma, glaces Jampi, fromages Beillevaire, charcuterie de Talensac) : ils sont commandés directement (`data/connaissances.json` › `achatsDirects`).
-- Boissons : les verres prévus (forfait 3 verres, verre de vin, boisson chaude…) sont répartis entre crémant, vins, bière, softs, café, puis convertis en bouteilles avec l'onglet *Bar* (« verres par bouteille ») ; à défaut, 6 verres par bouteille de 75 cl, signalé.
+- Boissons : les verres prévus (forfait 3 verres, verre de vin, boisson chaude…) sont répartis entre crémant, vins, bière, softs, café, puis convertis en bouteilles avec l'onglet *Bar* (« verres par bouteille ») ; à défaut, 6 verres par bouteille de 75 cl, signalé. Les bouteilles commandées par le client (« 3 AOC Côtes du Rhône… ») partent à la cave sous leur nom.
+- Produits de fond (café Cime, thé, chocolat, jus en BIB, sirop) : une seule ligne par semaine. Sans inventaire saisi et sous un demi-conditionnement, ils sont « sur la réserve » ; si l'inventaire ne couvre pas le besoin, le manque est commandé. Une livraison qui arriverait après le service passe en URGENT.
+- Ce que le moteur ne sait pas trancher est signalé par un ⚠ sur la fiche (titre de formule non compté, date ajoutée, convives introuvables) ou sur le menu du chef (plat halal absent du catalogue…).
+
+## Travail à plusieurs
+
+Dans Claude, chaque fiche est enregistrée à part, et les choix du chef et l'inventaire ligne par ligne : deux personnes peuvent travailler sur la même semaine sans s'écraser. Les saisies sont bloquées quelques secondes, le temps que la semaine partagée se charge. Une personne qui n'a qu'un accès en lecture voit un bandeau « Lecture seule » : il lui faut l'accès *Contributeur* (menu Partager de l'appli) pour saisir.
+
+Avant d'être enregistrés, les textes des documents sont débarrassés des téléphones, e-mails et IBAN.
 
 ## Ce que Claude apprend, et où c'est rangé
 
@@ -44,6 +52,10 @@ Dans Claude, tout est partagé par l'équipe (mémoire de l'artefact) :
 | Carnet de Claude | les analyses de retour, *Faire le point*, les notes de l'équipe | donner du contexte à Claude à chaque lecture de fiche |
 | Fournisseurs | *Modifier*, les relevés de Claude dans Chrome | délais, jours, conditionnements et prix (estimation du coût des bons) |
 | Fiches techniques | le classeur déposé sur la page | remplacer les grammages de `data/referentiel.json` |
+| Pièces les plus choisies | l'analyse de 529 devis et fiches de fonction (2024-2027) | classer la proposition du chef dès le premier jour (`connaissances.json` › `statsChoix`) |
+| Activité du Manoir | la même analyse | événements par mois et faits clés, dans le Carnet de Claude (`connaissances.json` › `activite`) |
+
+Le moteur est vérifié par 81 tests (`tests/moteur.test.js`) et, sur les 529 documents analysés, reconnaît 92 % des lignes cuisine sans l'aide de Claude.
 
 ## Claude dans Chrome
 

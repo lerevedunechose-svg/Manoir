@@ -88,10 +88,16 @@
    "contenu": [
     {
      "boisson": "pause",
-     "qte": 1
+     "qte": 1,
+     "qteSelonTexte": [
+      {
+       "si": "matin(?:ee)?s?\\s*(?:et|&|\\+|/)\\s*(?:l'|en |dans l')?apres[ -]?midi",
+       "qte": 2
+      }
+     ]
     }
    ],
-   "description": "1 boisson fraîche ou chaude par personne.",
+   "description": "1 boisson fraîche ou chaude par personne ; 2 quand « matin et après-midi » est écrit.",
    "absorbe": [
     "boisson_chaude",
     "soft",
@@ -442,10 +448,11 @@
      "sucre": true,
      "siTexte": "\\d+\\s*(?:pi[eè]ces?\\s*)?sucr[eé]es?",
      "qteDepuisTexte": "(?:pieces? )?sucrees?",
-     "qteMax": 8
+     "qteMax": 8,
+     "totalDepuisTexte": "pieces? sucrees?"
     }
    ],
-   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne (3 par défaut) ; « N pièces salées + M sucrées » ajoute M mignardises Honoré."
+   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne (3 par défaut) ; « N pièces salées + M sucrées » ajoute M mignardises Honoré par personne ; « 72 pièces sucrées » est un total (ramené par convive)."
   },
   {
    "id": "piece_speciale",
@@ -1247,7 +1254,8 @@
    ],
    "exclusions": [
     "re:gobelets?(?: [a-z]+){0,4} boissons? chaudes?"
-   ]
+   ],
+   "serviAvec": true
   },
   {
    "id": "jus_pomme",
@@ -1281,25 +1289,36 @@
     {
      "boisson": "soft",
      "qte": 2,
-     "boissonsDepuisTexte": "(?:boissons?|softs?)\\b(?! chaudes?)",
-     "qteMax": 4
+     "compte": "soft"
+    },
+    {
+     "boisson": "chaude",
+     "qte": 0,
+     "compte": "chaude"
     }
    ],
    "absorbe": [
     "soft",
     "jus_pomme",
     "soft_ou_chaude",
+    "boisson_chaude",
     {
-     "id": "boisson_chaude",
-     "saufSi": [
-      "re:\\+ (?:\\d+|une?) (?:boissons? chaudes?|cafes?|thes?)\\b"
+     "id": "aperitif",
+     "si": [
+      "re:\\b(?:parmi|au choix|choix)(?: [a-z0-9]+){0,10} (?:cremant|vins?|bieres?|champagne|kir|bulles)\\b"
+     ]
+    },
+    {
+     "id": "verre_vin",
+     "si": [
+      "re:\\b(?:parmi|au choix|choix)(?: [a-z0-9]+){0,10} (?:cremant|vins?|bieres?|champagne|kir|bulles)\\b"
      ]
     }
    ],
    "inclut": [
     "mocktail"
    ],
-   "description": "1 cocktail sans alcool (recette mocktail) + 2 boissons sans alcool."
+   "description": "1 cocktail sans alcool (recette mocktail) + les boissons écrites, comptées telles quelles (« + 2 boissons sans alcool ou chaudes » = 2, « 1 boisson chaude » = 1 chaude) ; jamais d'alcool ; rien d'écrit : 2 boissons sans alcool."
   },
   {
    "id": "soft",

@@ -233,7 +233,8 @@
         s.choix = choix;
         const stock = Object.assign({}, r.stock || {});
         Object.keys(s.stock || {}).forEach(k => { if (this.protege('stock:' + k)) stock[k] = s.stock[k]; });
-        Object.keys(stock).forEach(k => { if (!(stock[k] > 0)) delete stock[k]; });
+        // 0 = « compté, il n'en reste plus » (gardé) ; null = saisie effacée
+        Object.keys(stock).forEach(k => { if (stock[k] == null || !(stock[k] >= 0)) delete stock[k]; });
         s.stock = stock;
         if (!this.protege('options')) s.options = r.options || {};
         if (!this.protege('pdf')) s.pdf = r.pdf || null;
@@ -292,7 +293,7 @@
       const maj = {};
       sale.cles.forEach(k => {
         if (k.indexOf('choix:') === 0) { const c = k.slice(6); (maj.choix = maj.choix || {})[c] = choixVersMemoire(s.choix[c]); }
-        else if (k.indexOf('stock:') === 0) { const c = k.slice(6); (maj.stock = maj.stock || {})[c] = s.stock[c] > 0 ? s.stock[c] : 0; }
+        else if (k.indexOf('stock:') === 0) { const c = k.slice(6); (maj.stock = maj.stock || {})[c] = s.stock[c] >= 0 ? s.stock[c] : null; }
         else if (k === 'options') maj.options = copie(s.options || {});
         else if (k === 'pdf') maj.pdf = copie(s.pdf);
       });
@@ -415,6 +416,8 @@
     if (o && p.type === 'choix') { p.recettes = Object.assign({}, o.recettes); p.valide = !!o.valide; p.modifie = true; }
     return p;
   }
+  /** Stock réellement saisi (une saisie effacée vaut « pas compté », pas 0). */
+  function stockSaisi() { const r = {}; Object.keys(S.semaine.stock || {}).forEach(k => { const v = S.semaine.stock[k]; if (v != null && v >= 0) r[k] = v; }); return r; }
   function calculer() {
     if (S.calc) return S.calc;
     const sem = S.sem;
@@ -427,7 +430,7 @@
     evenements.sort((a, b) => a.jour.date.localeCompare(b.jour.date) || a.fiche.client.localeCompare(b.fiche.client));
     const opt = { margeDefaut: reglage('marge', 5) / 100, uneLivraison: !!(S.semaine.options && S.semaine.options.uneLivraison) };
     const besoins = M.calculerBesoins(evenements, S.idx, opt);
-    const commandes = M.calculerCommandes(besoins, S.idx, S.semaine.stock, { maintenant: new Date() });
+    const commandes = M.calculerCommandes(besoins, S.idx, stockSaisi(), { maintenant: new Date() });
     const convives = evenements.reduce((s, e) => s + (e.postes.length ? (e.jour.convives || Math.max.apply(null, e.postes.map(p => p.convives || 0))) : 0), 0);
     const pieces = evenements.reduce((s, e) => s + e.postes.filter(p => p.type === 'choix' && /salees|speciales|navettes/.test(p.famille))
       .reduce((t, p) => t + Object.values(p.recettes || {}).reduce((u, n) => u + n, 0) * p.convives, 0), 0);
@@ -1006,9 +1009,10 @@ ${texte.slice(0, 16000)}
       parF[fn].forEach(l => {
         const us = uniteSaisie(l.base);
         const val = S.semaine.stock && S.semaine.stock[l.cle];
-        const inp = h('input', { id: 'stock-' + M.slug(l.cle), class: 'stock-input', type: 'number', min: '0', step: us.f > 1 ? '0.1' : '1', inputmode: 'decimal', value: val ? M.arrondi(val / us.f, 3) : '', 'aria-label': 'En stock : ' + l.produit + ' (' + us.u + ')', placeholder: '0' });
+        const inp = h('input', { id: 'stock-' + M.slug(l.cle), class: 'stock-input', type: 'number', min: '0', step: us.f > 1 ? '0.1' : '1', inputmode: 'decimal', value: val != null ? M.arrondi(val / us.f, 3) : '', 'aria-label': 'En stock : ' + l.produit + ' (' + us.u + ')', placeholder: '0' });
         // pas de nouveau rendu : on garde le focus pour enchaîner la saisie au clavier
-        inp.addEventListener('change', () => modifier(s => { s.stock = s.stock || {}; const v = parseFloat(String(inp.value).replace(',', '.')); if (v > 0) s.stock[l.cle] = v * us.f; else delete s.stock[l.cle]; }, true));
+        // champ vide = pas compté ; 0 = compté, il n'en reste plus (le moteur commande alors tout le besoin)
+        inp.addEventListener('change', () => modifier(s => { s.stock = s.stock || {}; const brut = String(inp.value).trim(); const v = parseFloat(brut.replace(',', '.')); if (brut !== '' && v >= 0) s.stock[l.cle] = v * us.f; else s.stock[l.cle] = undefined; }, true));
         tb.appendChild(h('tr', null, h('td', null, l.produit), h('td', { class: 'qte' }, M.formatQte(l.qte, l.base)), h('td', { class: 'qte' }, inp, ' ', h('span', { class: 'note' }, us.u))));
       });
       grille.appendChild(h('div', { class: 'carte' }, h('h3', null, fn), h('div', { class: 'tableau-wrap' }, h('table', null, h('thead', null, h('tr', null, h('th', null, 'Produit'), h('th', { class: 'qte' }, 'Besoin'), h('th', { class: 'qte' }, 'En stock'))), tb))));

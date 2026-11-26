@@ -196,8 +196,9 @@
     if (typeof x === 'number') { const d = new Date(x); return isFinite(x) && !isNaN(d.getTime()) ? d : null; }
     return deIso(x);
   }
-  // mots suivis d'un numéro qui n'est pas un jour (« Salle 2 », « Option 1 », « Table 4 ») : jamais le début d'une liste de dates
-  const NOMS_NUMERO = /^(?:salle|salles|salon|salons|option|options|table|tables|lot|lots|etage|niveau|groupe|groupes|formule|formules|menu|menus|n|no|num|numero|ref|reference|version|v|zone|espace|chambre|chambres|bus|car|atelier|ateliers|session|sessions|module|modules|tarif|prix|devis|lieu|batiment|bloc|porte|tranche|categorie|tente|stand|equipe|equipes)$/;
+  // mots suivis d'un numéro qui n'est pas un jour (« Salle 2 », « Option 1 », « Table 4 », « Jour 2 – 8 décembre ») : jamais le
+  // début d'une liste de dates ; « jour » au singulier seulement (« les jours 4, 5 et 6 février » reste une liste)
+  const NOMS_NUMERO = /^(?:salle|salles|salon|salons|option|options|table|tables|lot|lots|etage|niveau|groupe|groupes|formule|formules|menu|menus|n|no|num|numero|ref|reference|version|v|zone|espace|chambre|chambres|bus|car|atelier|ateliers|session|sessions|module|modules|jour|tarif|prix|devis|lieu|batiment|bloc|porte|tranche|categorie|tente|stand|equipe|equipes)$/;
   /**
    * Dates écrites en français dans un texte : « Vendredi 11 décembre 2026 », « 4 + 5 + 6 février 2027 »,
    * « 4, 5 et 6 février », « 4/5/6 février », « du 4 au 6 février », « mardi 1er et mercredi 2 décembre », « 03/12/2026 ».
@@ -280,15 +281,18 @@
   }
   /**
    * Heure limite fixe écrite dans un délai : « avant 14h pour le lendemain », « J-1 avant 12h », « la veille avant 12h »,
-   * « commande avant 10h la veille », « avant-veille 10h », « jusqu'à midi la veille » → { jours, heure, minutes }
-   * (commander au plus tard « jours » avant la livraison, à cette heure-là) ; null sans veille / lendemain / J-n ou sans heure.
+   * « commande avant 10h la veille », « avant-veille 10h », « jusqu'à midi la veille », « 2 jours avant 12h » → { jours, heure, minutes }
+   * (commander au plus tard « jours » avant la livraison, à cette heure-là) ; null sans veille / lendemain / J-n / « N jours avant »
+   * ou sans heure.
    */
   function parseHeureLimite(s) {
     const t = sansAccents(s).toLowerCase().replace(/[’`´]/g, "'").replace(/\s+/g, ' ').trim();
     if (!t) return null;
     let jours = null;
     const mj = t.match(/\bj\s*-\s*(\d{1,2})\b/);
+    const mn = t.match(/(?:^|[^0-9])(\d{1,2})\s*(?:jours?|j)\b(?:\s+ouvres?)?\s+avant\b/);
     if (mj) jours = +mj[1];
+    else if (mn && +mn[1] >= 1) jours = +mn[1]; // « 2 jours avant 12h » : J-2 à 12 h
     else if (/avant[\s-]*veille/.test(t)) jours = 2;
     else if (/\bveille\b|\blendemain\b|\bj\s*\+\s*1\b/.test(t)) jours = 1;
     if (!(jours >= 1)) return null;
@@ -565,7 +569,8 @@
   // la négation porte sur le mot-clé qui la suit (au plus un mot entre les deux), dans le même membre de phrase :
   // on coupe à la ponctuation (, ; · ( ) / + et « - » entre espaces), voir normAvecMembres()
   // « servi avec un verre de vin », « servi avec café » ne sont PAS des négations : ce qui est servi avec le plat est inclus ;
-  // seul « servi avec le / la / les … » renvoie à une autre prestation (« verres de vin servis avec le cocktail déjeunatoire »)
+  // seul « servi avec le / la / les … » renvoie à une autre prestation (« verres de vin servis avec le cocktail déjeunatoire »),
+  // sauf devant une boisson servie avec le repas (forfait marqué serviAvec : « Déjeuner servi avec le café » garde le café)
   const NEGATIONS = /(?:^|\s)(pas de|pas d|sans|hors|aucun|aucune|non compris|non inclus|ni|pendant le|pendant la|pendant les|lors du|lors de|lors des|avant le|avant la|apres le|apres la|au cours du|durant le|durant la|au moment du|remplace le|remplace la|remplace les|remplacer le|remplacer la|remplacer les|a la place du|a la place de|a la place des|a la place d|en remplacement du|en remplacement de|en remplacement des|au lieu du|au lieu de|au lieu des|au lieu d|servie?s? avec (?:le|la|les|l))\s+(?:\S+\s+){0,1}$/;
   /**
    * Texte normalisé (comme norm) + pour chaque position, le début du membre de phrase qui la contient :
@@ -647,7 +652,8 @@
         occurrences(t, kw).forEach(([debut, fin]) => {
           // fenêtre de négation : 30 caractères au plus, sans sortir du membre de phrase
           const dm = membre[debut] != null ? membre[debut] : 0;
-          if (NEGATIONS.test(t.slice(Math.max(0, debut - 30, dm), debut))) return;
+          const neg = t.slice(Math.max(0, debut - 30, dm), debut).match(NEGATIONS);
+          if (neg && !(f.serviAvec && /^servie?s? avec/.test(neg[1]))) return;
           if (zones.some(([a, b]) => debut >= a && fin <= b)) return;
           trouves.push({ id: f.id, debut, fin, longueur: fin - debut, via: 'mot-clé', motCle: kw });
         });
@@ -815,67 +821,130 @@
     const s = String(l || '').trim().replace(/\s*:$/, '');
     return s.length >= 3 && s.length <= 30 && !/\d/.test(s) && /[A-Z]{3}/.test(sansAccents(s)) && s === s.toUpperCase();
   }
+  const RE_ENTETE_RESTO = /^(restauration|boissons?|restauration et boissons|restauration & boissons)\b/;
+  const RE_ENTETE_AUTRE = /^(deroule|configuration|budget|horaires|contact|evenement|nombre)\b/;
+  const RE_REGIME = /^(vegetarien|vegan|vegetalien|allergi|sans |enfant|bebe|personne|viande|poisson|halal|vg\b)/;
+  /**
+   * « 11 pièces salées », « 4 pièces sucrées », « 15 pièces par personne » : nombre de pièces en tête de ligne (null sinon).
+   * Au-delà de 20, c'est un total (« 198 pièces salées x 1,60€ ») ; « N pièces spéciales » est une prestation à part entière.
+   */
+  function nbPiecesEnTete(n) {
+    const m = n.match(/^(\d+(?:[.,]\d+)?)\s+(?:pieces?|verrines?|bouchees?)\b(?!\s+speciales?\b)/);
+    return m ? parseFloat(m[1].replace(',', '.')) : null;
+  }
+  const PIECES_PAR_PERSONNE_MAX = 20;
   /** Découpe une fiche de fonction (FF) : lignes « 15 cocktails… », « 31 menus du mois… » dans RESTAURATION / BOISSONS. */
   function prestationsFiche(lignes, idx) {
     const items = []; const remarques = []; let section = ''; let nouvelleSection = false;
+    // vraie section RESTAURATION / BOISSONS (un titre du déroulé comme « DÉJEUNER » ou « PAUSE » n'en ouvre pas une)
+    let enRestauration = false;
     const formulesCuisine = texte => detecterForfaits(texte, idx).filter(x => idx.forfaits[x.id] && !idx.forfaits[x.id].horsCuisine).map(x => x.id);
     const texteItem = it => [it.libelle].concat(it.details || []).join(' · ');
-    const nouvelItem = (l, quantite) => {
-      // un titre-formule en capitales (« COCKTAIL ») suivi directement de la ligne chiffrée de la même formule
-      // (« 40 cocktails dînatoires ») n'était qu'un titre : la ligne chiffrée le remplace
-      const prec = items[items.length - 1];
-      if (prec && prec.titreFormule && !prec.details.length && quantite != null) {
-        const seule = formulesCuisine(l);
-        if (formulesCuisine(l + ' · ' + prec.libelle).every(id => seule.indexOf(id) >= 0)) items.pop();
+    const estBoisson = id => (idx.forfaits[id] || {}).famille === 'Boissons';
+    // ligne qui ouvre sa propre prestation : « 30 forfaits… », « 2 planches… », « 198 pièces salées » (total) ; pas « 11 pièces salées »
+    const ligneChiffree = n => {
+      const nb = nbPiecesEnTete(n);
+      if (nb != null) return nb > PIECES_PAR_PERSONNE_MAX;
+      if (/^\d+\s+pieces?\s+speciales?\b/.test(n)) return +n.split(' ')[0] > PIECES_PAR_PERSONNE_MAX; // « 1 pièce spéciale » : un détail
+      const m = n.match(/^(\d+|x)\s+([a-z][a-z' ]*)/);
+      return !!m && !RE_REGIME.test(m[2]);
+    };
+    /**
+     * Un titre en capitales de la RESTAURATION (« BRUNCH », « COCKTAIL DÎNATOIRE PROCÉ ») n'ouvre une prestation que si rien
+     * de ce qui le suit, jusqu'au titre ou à la section suivante, n'en ouvre une : aucune ligne chiffrée, aucune ligne qui porte
+     * sa propre formule (« APÉRITIF / Kir ou soft », « SOFTS / Jus de pomme ») ; un titre-repas ne coiffe pas non plus une simple
+     * liste de boissons (« ACCUEIL CAFÉ / Café, thé, jus » = des boissons, pas de viennoiseries). Seules des pièces (« Crevette
+     * croustillante ») ou des lignes que sa formule comprend déjà (« BRUNCH / Viennoiseries, gaufres, huîtres ») le laissent ouvrir.
+     */
+    const titreOuvre = (i, titre) => {
+      const fT = formulesCuisine(titre);
+      const avecFormule = [];
+      for (let j = i + 1; j < lignes.length; j++) {
+        const l = lignes[j]; const n = norm(l);
+        if (estTitre(l) || (RE_ENTETE_RESTO.test(n) && n.length < 40) || RE_ENTETE_AUTRE.test(n)) break;
+        if (ligneChiffree(n)) return false;
+        const fL = formulesCuisine(l);
+        if (!fL.length) continue;
+        if (formulesCuisine(titre + ' · ' + l).some(id => fT.indexOf(id) < 0)) return false;
+        avecFormule.push(fL);
       }
+      return !(avecFormule.length && avecFormule.every(fL => fL.every(estBoisson)) && !fT.every(estBoisson));
+    };
+    const nouvelItem = (l, quantite) => {
       const it = { libelle: l, details: [], quantite };
       const codes = RE_LIGNE_NEGATIVE.test(norm(l)) ? [] : codesCatalogueDepuisTexte(l, idx);
       if (codes.length) it.choisis = codes.map(code => ({ code, texte: l }));
       items.push(it); nouvelleSection = false;
       return it;
     };
-    lignes.forEach(l => {
+    lignes.forEach((l, i) => {
       const n = norm(l);
-      if (/^(restauration|boissons?|restauration et boissons|restauration & boissons)\b/.test(n) && n.length < 40) { section = 'resto'; nouvelleSection = true; return; }
-      if (/^(deroule|configuration|budget|horaires|contact|evenement|nombre)\b/.test(n)) { section = n.split(' ')[0]; nouvelleSection = true; if (section !== 'deroule') return; }
+      if (RE_ENTETE_RESTO.test(n) && n.length < 40) { section = 'resto'; enRestauration = true; nouvelleSection = true; return; }
+      if (RE_ENTETE_AUTRE.test(n)) { section = n.split(' ')[0]; enRestauration = false; nouvelleSection = true; if (section !== 'deroule') return; }
       else if (estTitre(l)) {
         // un titre court en majuscules fait sortir du déroulé (« MENU » puis « 60 menus du mois ») ;
         // dans la restauration, un sous-titre (« SALÉ », « FROMAGES ») y reste, sauf titre clairement hors cuisine
         const resto = /menu|repas|cocktail|buffet|brunch|dejeuner|diner|pause|boisson|bar\b|dessert|aperitif|apero|restauration|traiteur|fromage|planche|vin\b|vins\b/.test(n);
         const horsResto = RE_TITRES_HORS_RESTO.test(n);
         let ordinaire = false;
-        if (!horsResto && (resto || section === 'resto')) {
-          // une ligne en capitales peut être une formule (« COCKTAIL DÎNATOIRE PROCÉ », « BRUNCH ») : elle ouvre une prestation
-          // si elle ajoute une formule à la prestation en cours (« PIÈCES SALÉES » sous un cocktail reste un sous-titre)
-          const dernier = section === 'resto' ? items[items.length - 1] : null;
+        if (!horsResto && section === 'resto') {
+          // dans la RESTAURATION, une ligne en capitales peut être une formule seule (« BRUNCH », « COCKTAIL DÎNATOIRE PROCÉ »
+          // suivi de ses pièces) : elle ouvre une prestation si elle ajoute une formule à la prestation en cours (« PIÈCES SALÉES »
+          // sous un cocktail reste un sous-titre) et que rien sous elle n'en ouvre une (voir titreOuvre) ; sinon c'est un titre
+          const dernier = items[items.length - 1];
           const avant = dernier ? formulesCuisine(texteItem(dernier)) : [];
           const apres = formulesCuisine(dernier ? texteItem(dernier) + ' · ' + l : l);
           if (apres.some(id => avant.indexOf(id) < 0)) {
-            section = 'resto';
-            nouvelItem(l, null).titreFormule = true;
-            return;
-          }
-          // ou une pièce choisie (« CREVETTE CROUSTILLANTE ») : ligne ordinaire de la restauration
-          if (section === 'resto' && codeCatalogueDepuisTexte(l, idx)) ordinaire = true;
+            if (enRestauration && titreOuvre(i, l)) {
+              nouvelItem(l, null);
+              return;
+            }
+            // titre-formule non compté : on le signale sur la fiche plutôt que de le perdre en silence
+            const fT = formulesCuisine(l).filter(id => avant.indexOf(id) < 0);
+            if (fT.length) remarques.push('⚠ Titre « ' + l.trim().slice(0, 60) + ' » non compté comme formule (' + fT.map(id => (idx.forfaits[id] || {}).nom || id).join(', ') + ') : vérifiez qu’il est couvert par les lignes en dessous, sinon ajoutez la formule sur la fiche.');
+          } else if (codeCatalogueDepuisTexte(l, idx)) ordinaire = true; // une pièce choisie (« CREVETTE CROUSTILLANTE »)
         }
         if (!ordinaire) {
           if (resto) section = 'resto';
-          else if (section !== 'resto' || horsResto) section = 'autre';
+          else if (section !== 'resto' || horsResto) { section = 'autre'; enRestauration = false; }
           nouvelleSection = true;
           return;
         }
       }
-      const sous = n.match(/^(\d+(?:[.,]\d+)?)\s+(pieces?|verrines?|bouchees?)\b/);
-      if (sous && items.length && section !== 'deroule') {
+      // « 1 pièce spéciale : Tataki… » sous un cocktail : un détail (la formule pièce spéciale), jamais le nombre de pièces du cocktail
+      if (items.length && section !== 'deroule' && /^(\d+)\s+pieces?\s+speciales?\b/.test(n) && +n.split(' ')[0] <= PIECES_PAR_PERSONNE_MAX) {
+        items[items.length - 1].details.push(l);
+        return;
+      }
+      const nb = section !== 'deroule' ? nbPiecesEnTete(n) : null;
+      if (nb != null && (items.length || nb > PIECES_PAR_PERSONNE_MAX)) {
         const dernier = items[items.length - 1];
-        dernier.details.push(l);
-        const nb = parseFloat(sous[1].replace(',', '.'));
         // qualificatif placé juste après « pièces » (« 12 pièces salées froides », « 6 pièces salées/sucrées »)
         const q = n.match(/^\S+\s+(?:pieces?|verrines?|bouchees?)\s*(\S+)?\s*(\S+)?/) || [];
         const est = (w, re) => !!w && re.test(w);
         const sale = est(q[1], /^salees?$/);
         const sucre = est(q[1], /^sucrees?$/) || (sale && est(q[2], /^sucrees?$/));
         const froidChaud = est(q[1], /^(froides?|chaudes?)$/) || (sale && est(q[2], /^(froides?|chaudes?)$/));
+        if (nb > PIECES_PAR_PERSONNE_MAX) {
+          // au-delà de 20, un total de pièces, jamais un nombre par personne ni un nombre de convives :
+          // « 72 pièces sucrées » sous une prestation en reste un détail (lu comme un total par le contenu sucré de sa formule) ;
+          // « 198 pièces salées x 1,60€ (11 sortes par personne) » est sa propre prestation (convives du jour, pièces ramenées
+          // par convive au développement)
+          if (sucre && !sale && dernier) { dernier.details.push(l); return; }
+          // sous une prestation chiffrée qui compte déjà ces pièces (« 30 cocktails dînatoires / 330 pièces salées ») : son total,
+          // ramené par convive ; une ligne qui ajoute une formule (« 30 pièces froides en ajout ») reste sa propre prestation
+          if (dernier && dernier.quantite >= 2 && !sucre) {
+            const avant = formulesCuisine(texteItem(dernier));
+            if (avant.length && formulesCuisine(texteItem(dernier) + ' · ' + l).every(id => avant.indexOf(id) >= 0)) {
+              dernier.details.push(l);
+              dernier.nbParConvive = nb / dernier.quantite; dernier.nbTotal = !sale; dernier.cumulFroidChaud = 0;
+              return;
+            }
+          }
+          nouvelItem(l, null).piecesTotal = nb;
+          return;
+        }
+        dernier.details.push(l);
         if (sucre && !sale) return; // « 4 pièces sucrées » : lu par le contenu « mignardises » du forfait
         if (froidChaud) {
           // « 8 pièces froides » puis « 4 pièces chaudes » : elles s'additionnent
@@ -893,8 +962,8 @@
       // toute ligne qui commence par une quantité est une prestation (« 6 Kirs pétillants x 6€ », « 3 AOC Côtes du Rhône… »),
       // sauf les mentions de régime ou de répartition (« 2 végétariens », « 21 viandes + 7 poissons ») qui complètent la ligne précédente
       const m = n.match(/^(\d+|x)\s+([a-z][a-z' ]*)/);
-      const regime = m && /^(vegetarien|vegan|vegetalien|allergi|sans |enfant|bebe|personne|viande|poisson|halal|vg\b)/.test(m[2]);
-      if (m && !regime && section !== 'deroule' && (section === 'resto' || /^(forfaits?|menus?|cocktails?|pdj|petits? dejeuners?|pauses?|brunchs?|plateaux?|planches?|mises? en bouche|portions?|verres?|bouteilles?|coupes?|gateaux?|pieces? montees?|repas|dejeuners?|diners?)\b/.test(m[2]))) {
+      const regime = m && RE_REGIME.test(m[2]);
+      if (m && !regime && section !== 'deroule' && (section === 'resto' || /^(forfaits?|menus?|cocktails?|pdj|petits? dejeuners?|pauses?|brunchs?|plateaux?|planches?|mises? en bouche|portions?|verres?|bouteilles?|coupes?|gateaux?|pieces? montees?|pieces? speciales?|repas|dejeuners?|diners?)\b/.test(m[2]))) {
         nouvelItem(l, m[1] === 'x' ? null : +m[1]);
         return;
       }
@@ -1022,7 +1091,7 @@
       id: 'f-' + slug(nomFichier || client).slice(0, 40) + '-' + (dates[0] || 'sd'),
       nomFichier: nomFichier || '', type, client, evenement, horaires: horairesDepuisTexte(enTete),
       convives: conv2.convives, adultes: conv2.adultes || null, enfants: conv2.enfants || null,
-      dates, regimes: Array.from(new Set(regimes)).slice(0, 6), remarques: remarques.slice(0, 12), lecture: 'locale',
+      dates, regimes: Array.from(new Set(regimes)).slice(0, 6), remarques: remarques.filter(r => /^⚠/.test(r)).concat(remarques.filter(r => !/^⚠/.test(r))).slice(0, 12), lecture: 'locale',
       jours: [],
     };
     const prestations = items.map((it, i) => {
@@ -1050,7 +1119,7 @@
         prixUnitaire: pu != null ? pu : null,
         date, forfaits: det.map(d => d.id), confiance: det.length ? Math.max.apply(null, det.map(d => d.score)) : 0,
         via: det.length ? det[0].via : null, choisis: it.choisis || [], exclus: it.exclus || [], repartition: repartitionDepuisTexte(texteComplet),
-        nbParConvive: it.nbParConvive || null, nbTotal: !!it.nbTotal,
+        nbParConvive: it.nbParConvive || null, nbTotal: !!it.nbTotal, piecesTotal: it.piecesTotal || null,
         horsCuisine: det.length > 0 && det.every(d => idx.forfaits[d.id] && idx.forfaits[d.id].horsCuisine),
       };
     });
@@ -1210,6 +1279,41 @@
     }
     return defaut;
   }
+  /** Premier nombre au-delà de max devant le motif (« 72 pièces sucrées » quand max = 8) : un total, pas un nombre par personne. */
+  function totalDepuisTexte(texte, motif, max) {
+    const t = norm(texte);
+    const re = new RegExp('(?:^|[^0-9])(\\d+)\\s*(?:' + motif + ')', 'g');
+    let m;
+    while ((m = re.exec(t))) { const n = +m[1]; if (n > (max || 0)) return n; }
+    return null;
+  }
+  /**
+   * Boissons écrites dans un forfait sans alcool, comptées telles quelles, morceau par morceau (« + », « | », « · », « ; »),
+   * le premier « N boissons / softs / cafés / thés » de chaque morceau :
+   * « 2 boissons sans alcool ou boissons chaudes » → 2 sans alcool, « 1 boisson chaude (café ou thé) » → 1 chaude,
+   * « 2 boissons chaudes » → 2 chaudes, « 3 boissons parmi Cola / Jus… / Boisson chaude » → 3 sans alcool ;
+   * le cocktail sans alcool est compté à part (recette mocktail). Un morceau répété à l'identique (libellé repris en détail)
+   * ne compte qu'une fois. null si aucune boisson n'est écrite.
+   */
+  function compterBoissons(texte) {
+    const r = { soft: 0, chaude: 0 }; let trouve = false; const vus = new Set();
+    String(texte || '').split(/[+|·;\n]/).forEach(seg => {
+      const cle = norm(seg); if (!cle || vus.has(cle)) return; vus.add(cle);
+      const t = sansAccents(seg).toLowerCase().replace(/[’`´]/g, "'").replace(/\s+/g, ' ').trim();
+      // boissons froides nommées (jus, limonade, sirop, cola, eau…) comptées comme « sans alcool »
+      const m = t.match(/(?:^|[^0-9a-z])(\d+|une?|deux|trois|quatre)\s+(boissons?|softs?|cafes?|thes?|jus|limonades?|sirops?|colas?|breizh|eaux?|diabolos?|schorles?)\b(.*)$/);
+      if (!m) return;
+      const n = /^\d+$/.test(m[1]) ? +m[1] : ({ un: 1, une: 1, deux: 2, trois: 3, quatre: 4 })[m[1]];
+      if (!(n > 0) || n > 6) return;
+      trouve = true;
+      // « boisson chaude », « café » : chaude ; « boisson chaude ou sans alcool » : une boisson au choix, comptée sans alcool
+      const chaude = /^cafes?|^thes?/.test(m[2]) || (/^\s*chaudes?\b/.test(m[3]) && !/\bou\b[^()]*\b(?:sans alcool|soft|fraiches?)\b/.test(m[3]));
+      r[chaude ? 'chaude' : 'soft'] += n;
+    });
+    return trouve ? r : null;
+  }
+  /** Quantité d'un contenu selon le texte (qteSelonTexte : « journée … déjeunatoire » → 3 sucrées, « matin et après-midi » → 2 pauses). */
+  function qteSelon(c, bas) { return (c.qteSelonTexte || []).reduce((q, r) => (r && testeTexte(r.si, bas) ? r.qte : q), c.qte); }
   /**
    * Bouteilles comptées à l'unité (forfait parUnite) : « 29 bouteilles de champagne » → 29 ;
    * « 1/2 bouteille par personne » × 30 → 15 ; ligne de devis → sa quantité (en verres si le prix unitaire est celui d'un verre).
@@ -1242,11 +1346,18 @@
     let q = p.quantite;
     // ligne non datée d'un devis sur plusieurs jours (« Pause café (10 pers. x 3 jours) » = 30) : la quantité couvre tous
     // les jours quand le libellé le dit (« x 3 jours ») ou qu'elle vaut l'effectif × le nombre de jours ; sinon elle vaut
-    // pour chaque jour (prudent : on commande trop plutôt que pas assez)
-    if (q && p.appliqueATousLesJours && nbJours > 1 && lus && q >= 1.5 * lus) {
-      const parJour = q / nbJours;
-      const ditJours = /\b\d+\s*jours?\b/.test(norm(p.libelle));
-      if (ditJours || (Math.abs(parJour - Math.round(parJour)) < 1e-9 && Math.abs(parJour - lus) <= 0.2 * lus)) q = Math.ceil(parJour - 1e-9);
+    // pour chaque jour (prudent : on commande trop plutôt que pas assez).
+    // Une formule servie plusieurs fois par personne (« Pause café matin et après-midi » = 2) : une quantité qui vaut
+    // effectif × services (× jours) est un total, on la ramène à l'effectif du jour (120 pour 20 sur 3 jours = 20 × 2 par jour).
+    if (q && lus && q >= 1.5 * lus) {
+      const n = p.appliqueATousLesJours && nbJours > 1 ? nbJours : 1;
+      const parJour = q / n;
+      const entier = Math.abs(parJour - Math.round(parJour)) < 1e-9;
+      const cs = (forfait && forfait.contenu) || [];
+      const bas = sansAccents([p.libelle].concat(p.details || []).join(' · ')).toLowerCase().replace(/[’`´]/g, "'");
+      const services = cs.length === 1 && cs[0].qteSelonTexte && cs[0].qte > 0 ? qteSelon(cs[0], bas) / cs[0].qte : 1;
+      if (n > 1 && (/\b\d+\s*jours?\b/.test(norm(p.libelle)) || (entier && Math.abs(parJour - lus) <= 0.2 * lus))) q = Math.ceil(parJour - 1e-9);
+      else if (services > 1 && entier && Math.abs(parJour / services - lus) <= 0.2 * lus) q = Math.ceil(parJour / services - 1e-9);
     }
     if (jour.convivesForces && jour.convives) {
       // effectif corrigé par le chef : les lignes qui suivaient l'effectif lu prennent la nouvelle valeur, les autres
@@ -1282,13 +1393,24 @@
       if (forfait.inclut) forfait.inclut.forEach(id => { if (!remplaces.has(id)) ajouterContenu(idx.forfaits[id], p, convives, texte, profondeur + 1, origine, remplaces); });
       const bas = sansAccents(texte).toLowerCase().replace(/[’`´]/g, "'");
       // valeur par défaut selon le contexte (« journée de travail » : cocktail déjeunatoire à 3 sucrées), puis nombre lu dans le texte
-      const defautSelon = c => (c.qteSelonTexte || []).reduce((q, r) => (r && testeTexte(r.si, bas) ? r.qte : q), c.qte);
+      const defautSelon = c => qteSelon(c, bas);
+      // une ligne « 198 pièces salées » (total de pièces) compte ses pièces : les pièces salées de la formule, et ce qui est
+      // écrit (contenu à condition siTexte, « 72 pièces sucrées ») ; pas le reste de la formule (mignardises d'office…)
+      const totalPieces = p.piecesTotal && (forfait.contenu || []).some(x => x.principal && x.choix === 'salees_cocktail') ? p.piecesTotal : null;
       const lireQte = c => (c.qteDepuisTexte ? nbParPersonne(texte, c.qteDepuisTexte, defautSelon(c), p, c.qteMax) : defautSelon(c));
       (forfait.contenu || []).forEach((c, ci) => {
         // variantes : « 3 verres parmi crémant, vin, bière, sans alcool » = 3 boissons en tout, pas 3 + 1
         if (c.siTexte && !testeTexte(c.siTexte, bas)) return;
         if (c.saufSiTexte && testeTexte(c.saufSiTexte, bas)) return;
+        if (totalPieces && !c.principal && !c.siTexte) return;
         let parConvive = lireQte(c);
+        // « 198 pièces salées (11 sortes par personne) » : un total de pièces, ramené par convive (jamais 198 par personne)
+        if (totalPieces && c.principal && convives > 0) parConvive = totalPieces / convives;
+        // « 72 pièces sucrées (4 par personne) » : un total (au-delà de qteMax), ramené par convive ; « + 2 sucrées » reste par personne
+        if (c.totalDepuisTexte && convives > 0) {
+          const tot = totalDepuisTexte(texte, c.totalDepuisTexte, c.qteMax);
+          if (tot) parConvive = tot / convives;
+        }
         // « 11 pièces salées » lu sur la fiche : seulement pour les pièces salées (jamais le plat d'un menu)
         if (p.nbParConvive && c.choix === 'salees_cocktail' && c.principal) {
           parConvive = p.nbParConvive;
@@ -1390,6 +1512,12 @@
           }
           else if (c.achat) { ref = { achat: c.achat }; label = c.achat.produit; }
           if (!ref) return;
+          if (c.compte) {
+            // forfait sans alcool : les boissons écrites, comptées telles quelles ; rien d'écrit → la quantité par défaut
+            const n = compterBoissons(texte);
+            if (n) parConvive = n[c.compte] || 0;
+            if (!(parConvive > 0)) return;
+          }
           if (c.boissonsDepuisTexte) {
             // « forfait 3 verres », « 2 verres de vin », « 2 coupes de crémant » (jamais le nombre de convives en tête de fiche)
             parConvive = nbParPersonne(texte, typeof c.boissonsDepuisTexte === 'string' ? c.boissonsDepuisTexte : 'verres?', parConvive, p, c.qteMax || 6);
@@ -1605,11 +1733,16 @@
    *
    * Produits de fond (café, thé, chocolat, jus en BIB, sirop : ligne.fond) : ils vivent sur la réserve de la maison.
    *  - une seule ligne par produit et par fournisseur pour la semaine, à la livraison de fond la plus tôt ; si son heure limite
-   *    est déjà passée, à la prochaine livraison encore possible (livraison.reportee = true) : la réserve couvre en attendant ;
-   *  - besoin brut de la semaine affiché (besoin) ; un conditionnement entier (seau, BIB, bouteille) n'est proposé que si le
-   *    besoin atteint la moitié d'un conditionnement ; sinon aCommander = 0, reserve = true, aPrendreSurReserve = besoin restant
-   *    (et une alerte « à prendre sur la réserve ») ; conditionnement inconnu (sachets, grammes sans colis) : besoin brut proposé ;
-   *  - jamais « retard » : une livraison qui ne porte que du fond reste « ok » et n'entre pas dans prochaineLimite.
+   *    est déjà passée, à la prochaine livraison encore possible (livraison.reportee = true) : la réserve couvre en attendant,
+   *    mais jamais au-delà du premier service qui en a besoin : si la prochaine livraison possible arrive après lui, la ligne
+   *    reste sur la livraison de l'événement, en urgence (ligne.tardive = livraison.tardive = true, urgence de l'heure limite,
+   *    alerte « la réserve doit couvrir ») ;
+   *  - à commander = besoin − stock saisi, arrondi au conditionnement (seau, BIB, bouteille) ; sans stock saisi, un besoin de
+   *    moins d'un demi-conditionnement est « sur la réserve » (aCommander = 0, reserve = true, aPrendreSurReserve = besoin, alerte) ;
+   *    un stock saisi qui ne couvre pas le besoin fait commander le manque (arrondi au conditionnement) ;
+   *    conditionnement inconnu (sachets, grammes sans colis) : besoin brut proposé ;
+   *  - hors livraison tardive, jamais « retard » : une livraison qui ne porte que du fond reste « ok » et n'entre pas dans
+   *    prochaineLimite.
    */
   function calculerCommandes(besoins, idx, stock, options) {
     options = options || {};
@@ -1619,22 +1752,29 @@
     const parF = {};
     // fournisseurs à long délai (≥ 3 jours) : une seule livraison, la plus tôt de la semaine ; produits de fond : une seule
     // livraison de fond, la plus tôt de la semaine
-    const plusTot = {}; const plusTotFond = {};
+    const plusTot = {}; const plusTotFond = {}; const premierServiceFond = {};
     besoins.lignes.forEach(l => {
       if (l.type === 'maison') return;
-      if (!plusTot[l.fournisseurSlug] || l.dateBesoin < plusTot[l.fournisseurSlug]) plusTot[l.fournisseurSlug] = l.dateBesoin;
-      if (l.fond && (!plusTotFond[l.fournisseurSlug] || l.dateBesoin < plusTotFond[l.fournisseurSlug])) plusTotFond[l.fournisseurSlug] = l.dateBesoin;
+      const fs = l.fournisseurSlug;
+      if (!plusTot[fs] || l.dateBesoin < plusTot[fs]) plusTot[fs] = l.dateBesoin;
+      if (!l.fond) return;
+      if (!plusTotFond[fs] || l.dateBesoin < plusTotFond[fs]) plusTotFond[fs] = l.dateBesoin;
+      // premier service (date de l'événement) qui a besoin d'un produit de fond de ce fournisseur
+      (l.pour || []).forEach(x => { if (x.date && (!premierServiceFond[fs] || x.date < premierServiceFond[fs])) premierServiceFond[fs] = x.date; });
     });
     const dateFond = {};
     const livraisonFond = (fSlug, f, regroupe) => {
       if (dateFond[fSlug]) return dateFond[fSlug];
       let date = jourLivraison(regroupe ? plusTot[fSlug] : plusTotFond[fSlug], f);
-      let reportee = false;
+      let reportee = false; let tardive = false;
+      const service = premierServiceFond[fSlug] || date;
       if (heureLimite(date, f, maintenant).limite < maintenant) {
         const p = prochaineLivraisonPossible(date, f, maintenant);
-        if (p && p !== date) { date = p; reportee = true; }
+        // la réserve couvre jusqu'au réassort, à condition qu'il arrive au plus tard le jour du premier service
+        if (p && p <= service) { if (p !== date) { date = p; reportee = true; } }
+        else tardive = true; // trop tard : on reste sur la livraison de l'événement, en urgence
       }
-      return (dateFond[fSlug] = { date, reportee });
+      return (dateFond[fSlug] = { date, reportee, tardive, service });
     };
     // 1er passage : regroupe par fournisseur, livraison et produit (on additionne avant d'arrondir)
     besoins.lignes.forEach(l => {
@@ -1653,6 +1793,7 @@
         x = { cle: l.cle, cleStock, produit: l.produit, produitSlug: l.produitSlug, base: l.base, besoin: 0, besoinBrut: 0, coef: l.coef, pour: [], type: l.type,
           verres: l.verres != null ? 0 : null, verresParBouteille: l.verresParBouteille || null, vpbDefaut: l.vpbDefaut, fond: !!l.fond };
         if (lf && lf.reportee) x.reportee = true;
+        if (lf && lf.tardive) { x.tardive = true; x.premierService = lf.service; }
         liv.lignes.push(x);
       }
       x.besoin += l.qte; x.besoinBrut += l.qteBrute; x.pour = x.pour.concat(l.pour);
@@ -1662,6 +1803,7 @@
     Object.values(parF).forEach(bon => {
       const f = bon.infos;
       Object.keys(bon.livraisons).sort().forEach(d => bon.livraisons[d].lignes.forEach(x => {
+        const stockSaisi = Object.prototype.hasOwnProperty.call(stock, x.cleStock);
         const dispo = restant[x.cleStock] || 0;
         const utilise = Math.min(dispo, x.besoin);
         restant[x.cleStock] = dispo - utilise;
@@ -1677,12 +1819,13 @@
         let reserve = false; let aPrendreSurReserve = 0; let seuilReserve = null;
         if (x.fond) {
           // produit de fond : conditionnement = colis connu, à défaut le minimum de commande (« seau 8kg »), à défaut le
-          // contenant lui-même (BIB 5 L, bouteille 70 cl) ; moins d'un demi-conditionnement → à prendre sur la réserve
+          // contenant lui-même (BIB 5 L, bouteille 70 cl) ; sans stock saisi, moins d'un demi-conditionnement → à prendre sur la
+          // réserve ; un stock saisi qui ne couvre pas le besoin : le manque est commandé (arrondi au conditionnement plus bas)
           if (!cond && f && f.minimumParse && f.minimumParse.base === x.base) cond = f.minimumParse;
           const pack = cond || (x.verresParBouteille ? { qte: 1, base: x.base, libelle: x.base } : null);
           if (pack && pack.qte > 0) {
             seuilReserve = pack.qte / 2;
-            if (aCommander > 0 && aCommander < seuilReserve) { reserve = true; aPrendreSurReserve = aCommander; aCommander = 0; }
+            if (!stockSaisi && aCommander > 0 && aCommander < seuilReserve) { reserve = true; aPrendreSurReserve = aCommander; aCommander = 0; }
           }
         }
         let colis = null;
@@ -1703,10 +1846,12 @@
     const bons = Object.values(parF).map(b => {
       b.livraisons = Object.values(b.livraisons).sort((x, y) => x.date.localeCompare(y.date)).map(liv => {
         const hl = heureLimite(liv.date, b.infos, maintenant);
-        // produits de fond seuls (café, thé, jus en BIB) : réserve à vérifier, pas une urgence liée aux événements
+        // produits de fond seuls (café, thé, jus en BIB) : réserve à vérifier, pas une urgence liée aux événements ;
+        // sauf livraison tardive (le réassort arriverait après le premier service) : l'urgence de l'heure limite
         const fond = liv.lignes.length > 0 && liv.lignes.every(x => x.fond);
-        const urgence = fond ? 'ok' : hl.urgence;
-        return Object.assign(liv, { limite: hl.limite, delaiConnu: hl.delaiConnu, heureFixe: hl.heureFixe, urgence, fond,
+        const tardive = liv.lignes.some(x => x.tardive && x.aCommander > 0);
+        const urgence = fond && !tardive ? 'ok' : hl.urgence;
+        return Object.assign(liv, { limite: hl.limite, delaiConnu: hl.delaiConnu, heureFixe: hl.heureFixe, urgence, fond, tardive,
           reportee: liv.lignes.some(x => x.reportee), total: liv.lignes.filter(x => x.aCommander > 0).length });
       });
       const f = b.infos;
@@ -1733,7 +1878,11 @@
       if (b.livraisons.some(l => l.fond && l.reportee && l.total > 0)) {
         b.alertes.push('Produits de fond : l’heure limite de la première livraison utile est passée ; réassort à la prochaine livraison possible, la réserve couvre en attendant.');
       }
-      b.prochaineLimite = b.livraisons.filter(l => !l.fond).reduce((m, l) => (!m || l.limite < m ? l.limite : m), null);
+      b.livraisons.forEach(liv => liv.lignes.filter(x => x.tardive && x.aCommander > 0).forEach(x => {
+        b.alertes.push('URGENT – ' + x.produit + ' : l’heure limite de la livraison du ' + jourCourt(liv.date) + ' est passée et la suivante arriverait après le service du '
+          + jourCourt(x.premierService) + ' : la réserve doit couvrir ' + formatQte(x.besoin, x.base) + ', sinon commander tout de suite (appel au fournisseur) ou acheter ailleurs.');
+      }));
+      b.prochaineLimite = b.livraisons.filter(l => !l.fond || l.tardive).reduce((m, l) => (!m || l.limite < m ? l.limite : m), null);
       b.urgence = b.livraisons.reduce((u, l) => ['retard', 'aujourdhui', 'bientot', 'ok'].indexOf(l.urgence) < ['retard', 'aujourdhui', 'bientot', 'ok'].indexOf(u) ? l.urgence : u, 'ok');
       return b;
     }).sort((a, b) => (a.prochaineLimite ? a.prochaineLimite.getTime() : Infinity) - (b.prochaineLimite ? b.prochaineLimite.getTime() : Infinity) || a.nom.localeCompare(b.nom));
