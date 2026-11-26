@@ -69,7 +69,8 @@
    "description": "1 boisson chaude + 1 jus de pomme bio + 2 mini-viennoiseries pur beurre.",
    "absorbe": [
     "boisson_chaude",
-    "jus_pomme"
+    "jus_pomme",
+    "soft_ou_chaude"
    ]
   },
   {
@@ -93,7 +94,17 @@
    "description": "1 boisson fraîche ou chaude par personne.",
    "absorbe": [
     "boisson_chaude",
-    "soft"
+    "soft",
+    "soft_ou_chaude"
+   ],
+   "exclusions": [
+    "re:pause de \\d",
+    "pause dejeuner",
+    "pause du dejeuner",
+    "pause meridienne",
+    "pause midi",
+    "ou pause",
+    "pause repas"
    ]
   },
   {
@@ -130,7 +141,12 @@
     "menu e + p",
     "plat + dessert",
     "menu du marche",
-    "menus du marche"
+    "menus du marche",
+    "menu",
+    "menus",
+    "menus surprises",
+    "menu unique",
+    "menus uniques"
    ],
    "contenu": [
     {
@@ -162,6 +178,12 @@
    "description": "Menu unique au choix du chef : entrée + plat (purée, légumes, jus) + dessert. Répartition viande / poisson / végétarien si indiquée.",
    "absorbe": [
     "mignardises"
+   ],
+   "exclusions": [
+    "dans les menus",
+    "dans le menu",
+    "hors menu",
+    "carte des menus"
    ]
   },
   {
@@ -223,18 +245,43 @@
     "cocktails dejeunatoire",
     "cocktail dejeunatoires",
     "cocktails dinatoire",
-    "pieces salees",
-    "pieces salees froides"
+    "aperitif dinatoire",
+    "aperitifs dinatoires",
+    "aperitifs dinatoire",
+    "aperitif dinatoires"
    ],
    "exclusions": [
     "cocktail sans alcool",
     "cocktail convivial",
-    "atelier cocktail",
-    "ateliers cocktail"
+    "serviettes cocktail",
+    "serviette cocktail",
+    "verres cocktail",
+    "en cocktail d accueil"
    ],
    "absorbe": [
     "mignardises",
-    "dejeuner_menu_chef"
+    {
+     "id": "dejeuner_menu_chef",
+     "saufSi": [
+      "assis",
+      "puis",
+      "suivi",
+      "menu",
+      "menus",
+      "entree + plat"
+     ]
+    },
+    "mises_en_bouche",
+    {
+     "id": "piece_froide",
+     "saufSi": [
+      "en ajout",
+      "supplementaire",
+      "supplementaires",
+      "en plus",
+      "en supplement"
+     ]
+    }
    ],
    "contenu": [
     {
@@ -243,16 +290,45 @@
      "recettes": 8,
      "principal": true,
      "label": "{n} pièces salées au choix du chef",
-     "qteDepuisTexte": "pieces? salees?"
+     "qteDepuisTexte": "pieces? salees?",
+     "qteMax": 20
     },
     {
      "code": "P051",
      "qte": 4,
      "label": "Mignardises Honoré",
-     "qteDepuisTexte": "(?:pieces? sucrees?|mignardises?)"
+     "qteDepuisTexte": "(?:pieces? sucrees?|mignardises?)",
+     "sucre": true,
+     "qteMax": 8,
+     "qteSelonTexte": [
+      {
+       "si": "^(?=[\\s\\S]*(?:journee|seminaire))(?=[\\s\\S]*(?:dejeunatoire|cocktails? dej\\b))",
+       "qte": 3
+      }
+     ]
     }
    ],
-   "description": "11 pièces salées (8 choisies + 3 surprises du chef, une pièce peut compter double) + 4 mignardises Honoré."
+   "description": "11 pièces salées (8 choisies + 3 surprises du chef, une pièce peut compter double) + 4 mignardises Honoré ; dans une journée de travail, le cocktail déjeunatoire remplace le déjeuner assis (11 salées + 3 sucrées).",
+   "exclusionsGlobales": [
+    "atelier cocktail",
+    "ateliers cocktail",
+    "atelier cocktails",
+    "ateliers cocktails"
+   ],
+   "remplaceInclus": [
+    {
+     "id": "dejeuner_menu_chef",
+     "si": [
+      "cocktail dejeunatoire",
+      "cocktails dejeunatoires",
+      "cocktail dejeunatoires",
+      "cocktails dejeunatoire",
+      "cocktail dej",
+      "cocktails dej",
+      "cocktail debout"
+     ]
+    }
+   ]
   },
   {
    "id": "cocktail_convivial",
@@ -329,20 +405,23 @@
     "mises en bouche",
     "mise en bouche",
     "amuse bouche",
-    "amuses bouches"
+    "amuses bouches",
+    "pieces salees",
+    "piece salee"
    ],
    "contenu": [
     {
      "choix": "salees_cocktail",
      "qte": 3,
-     "qteDepuisTexte": "(?:mises? en bouche|par personne|par pers|pieces? par)",
+     "qteDepuisTexte": "(?:mises? en bouche |pieces? salees? )?par (?:personne|pers|convive)|mises? en bouche|pieces? salees?",
      "recettes": 3,
-     "recettesDepuisTexte": "(?:mises? en bouche|par personne|par pers|pieces? par)",
+     "recettesDepuisTexte": "(?:mises? en bouche |pieces? salees? )?par (?:personne|pers|convive)|mises? en bouche|pieces? salees?",
      "principal": true,
-     "label": "{n} mises en bouche du chef"
+     "label": "{n} mises en bouche du chef",
+     "qteMax": 15
     }
    ],
-   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne."
+   "description": "3, 4 ou 5 mises en bouche au choix du chef par personne (3 par défaut)."
   },
   {
    "id": "piece_speciale",
@@ -392,9 +471,11 @@
    "contenu": [
     {
      "code": "P041",
-     "qte": 1
+     "qte": 1.4,
+     "label": "Plateau de fromages Beillevaire 70 g"
     }
-   ]
+   ],
+   "description": "70 g de fromages Beillevaire par personne (50 g seulement dans le cocktail convivial)."
   },
   {
    "id": "planche_charcuterie",
@@ -586,7 +667,17 @@
     "boisson_chaude",
     "jus_pomme",
     "huitres",
-    "aperitif"
+    "aperitif",
+    "petit_dejeuner",
+    "plateau_fromages",
+    "planche_charcuterie",
+    "planche_poisson",
+    "coupe_champagne",
+    "kir",
+    "kir_petillant",
+    "soft",
+    "brunch_enfant",
+    "soft_ou_chaude"
    ]
   },
   {
@@ -618,7 +709,8 @@
    ],
    "absorbe": [
     "boisson_chaude",
-    "jus_pomme"
+    "jus_pomme",
+    "soft_ou_chaude"
    ]
   },
   {
@@ -647,7 +739,8 @@
    ],
    "absorbe": [
     "glace",
-    "jus_pomme"
+    "jus_pomme",
+    "soft_ou_chaude"
    ]
   },
   {
@@ -681,7 +774,8 @@
    "absorbe": [
     "glace",
     "jus_pomme",
-    "soft"
+    "soft",
+    "soft_ou_chaude"
    ]
   },
   {
@@ -763,7 +857,12 @@
      "code": "P054",
      "qte": 1
     }
-   ]
+   ],
+   "remplaceChoix": {
+    "famille": "dessert",
+    "code": "P054",
+    "parUnite": 1
+   }
   },
   {
    "id": "forfait_boissons",
@@ -773,30 +872,65 @@
     "forfait boissons",
     "forfait boisson",
     "forfaits boissons",
-    "forfaits boisson"
+    "forfaits boisson",
+    "forfait 2 verres",
+    "forfait 3 verres",
+    "forfait 4 verres",
+    "forfaits 2 verres",
+    "forfaits 3 verres",
+    "forfaits 4 verres",
+    "forfait boissons 3 verres",
+    "verres d alcool",
+    "verre d alcool"
    ],
    "contenu": [
     {
      "boisson": "alcool",
      "qte": 3,
-     "boissonsDepuisTexte": true,
+     "boissonsDepuisTexte": "verres?",
+     "qteMax": 6,
+     "saufSiTexte": "parmi[^+|·()]*sans alcool",
      "label": "Verres d'alcool (crémant, vins, bière)"
     },
     {
+     "boisson": "forfait_mixte",
+     "qte": 3,
+     "boissonsDepuisTexte": "verres?",
+     "qteMax": 6,
+     "siTexte": "parmi[^+|·()]*sans alcool",
+     "label": "Verres au choix (crémant, vins, bière, sans alcool)"
+    },
+    {
      "boisson": "sans_alcool_ou_chaude",
-     "qte": 1
+     "qte": 1,
+     "saufSiTexte": "parmi[^+|·()]*sans alcool"
     }
    ],
-   "description": "N verres d'alcool (nombre lu dans le libellé, 3 par défaut) + 1 boisson sans alcool ou chaude.",
+   "description": "N verres d'alcool (nombre lu dans le libellé, 3 par défaut) + 1 boisson sans alcool ou chaude ; « N verres parmi crémant, vin, bière, sans alcool » = N boissons en tout, sans alcool compris.",
    "cedeA": [
     "verre_vin",
-    "aperitif"
+    "aperitif",
+    "forfait_sans_alcool"
    ],
    "absorbe": [
     "soft",
     "boisson_chaude",
-    "jus_pomme"
-   ]
+    "jus_pomme",
+    "verre_vin",
+    "aperitif",
+    "kir",
+    "kir_petillant",
+    "coupe_champagne",
+    "soft_ou_chaude",
+    {
+     "id": "mocktail",
+     "si": [
+      "parmi",
+      "au choix"
+     ]
+    }
+   ],
+   "cedeASaufSi": "\\d+ verres?\\b(?! d(?:e |')(?:vin|cremant|champagne|bulles|biere|rouge|blanc|rose))"
   },
   {
    "id": "verre_vin",
@@ -810,7 +944,9 @@
    "contenu": [
     {
      "boisson": "vin",
-     "qte": 1
+     "qte": 1,
+     "boissonsDepuisTexte": "verres? de vin",
+     "qteMax": 5
     }
    ]
   },
@@ -823,26 +959,217 @@
     "verre de cloture",
     "vin d honneur",
     "coupe de cremant",
-    "kir",
-    "kirs",
-    "kir petillant",
-    "kirs petillants",
-    "punch",
-    "punchs",
     "verre d arrivee",
     "verres d arrivee",
-    "coupe de champagne",
-    "coupes de cremant"
+    "coupes de cremant",
+    "coupe de bulles",
+    "coupes de bulles",
+    "bulles",
+    "cremant"
    ],
    "exclusions": [
-    "aperitif dinatoire"
+    "aperitif dinatoire",
+    "a l aperitif",
+    "pour l aperitif"
    ],
    "contenu": [
     {
      "boisson": "aperitif",
+     "qte": 1,
+     "boissonsDepuisTexte": "coupes?|aperitifs?|verres? d arrivee|verres? de cloture",
+     "qteMax": 4
+    }
+   ],
+   "cedeA": [
+    "kir",
+    "kir_petillant",
+    "punch",
+    "coupe_champagne",
+    "mojito",
+    "cocktail_spritz",
+    "mocktail",
+    "bouteilles"
+   ],
+   "cedeASaufSi": "au choix|parmi|kir\\s*,|,\\s*kir\\b|kir ou|ou (?:un )?kir",
+   "absorbe": [
+    "kir",
+    "kir_petillant",
+    "punch",
+    "coupe_champagne",
+    "mojito",
+    "cocktail_spritz"
+   ]
+  },
+  {
+   "id": "mojito",
+   "nom": "Cocktail Mojito",
+   "famille": "Boissons",
+   "motsCles": [
+    "mojito",
+    "mojitos",
+    "cocktail mojito",
+    "cocktails mojito"
+   ],
+   "exclusions": [
+    "virgin mojito",
+    "mojito sans alcool"
+   ],
+   "contenu": [
+    {
+     "achat": {
+      "produit": "Rhum blanc (bouteille 70 cl)",
+      "fournisseur": "Cave (à préciser)",
+      "qte": 0.057,
+      "unite": "bouteille"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Menthe fraîche (botte)",
+      "fournisseur": "",
+      "qte": 0.1,
+      "unite": "botte"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Citron vert",
+      "fournisseur": "",
+      "qte": 0.5,
+      "unite": "pièce"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Sucre de canne liquide",
+      "fournisseur": "",
+      "qte": 1,
+      "unite": "cl"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Eau gazeuse (cocktails)",
+      "fournisseur": "Fourgon",
+      "qte": 6,
+      "unite": "cl"
+     },
      "qte": 1
     }
-   ]
+   ],
+   "description": "Rhum blanc 4 cl, menthe, ½ citron vert, sucre de canne, eau gazeuse."
+  },
+  {
+   "id": "kir",
+   "nom": "Kir (muscadet + cassis)",
+   "famille": "Boissons",
+   "motsCles": [
+    "kir",
+    "kirs",
+    "kir au muscadet",
+    "kirs au muscadet",
+    "kir breton"
+   ],
+   "contenu": [
+    {
+     "bar": "Muscadet",
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Crème de cassis (bouteille 70 cl)",
+      "fournisseur": "Cave (à préciser)",
+      "qte": 0.03,
+      "unite": "bouteille"
+     },
+     "qte": 1
+    }
+   ],
+   "description": "1 verre de muscadet + 2 cl de crème de cassis."
+  },
+  {
+   "id": "kir_petillant",
+   "nom": "Kir pétillant (crémant + cassis)",
+   "famille": "Boissons",
+   "motsCles": [
+    "kir petillant",
+    "kirs petillants",
+    "kir royal",
+    "kirs royaux"
+   ],
+   "contenu": [
+    {
+     "bar": "Crémant",
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Crème de cassis (bouteille 70 cl)",
+      "fournisseur": "Cave (à préciser)",
+      "qte": 0.03,
+      "unite": "bouteille"
+     },
+     "qte": 1
+    }
+   ],
+   "description": "1 coupe de crémant + 2 cl de crème de cassis."
+  },
+  {
+   "id": "punch",
+   "nom": "Punch maison",
+   "famille": "Boissons",
+   "motsCles": [
+    "punch",
+    "punchs",
+    "planteur"
+   ],
+   "contenu": [
+    {
+     "achat": {
+      "produit": "Rhum ambré (punch, bouteille 70 cl)",
+      "fournisseur": "Cave (à préciser)",
+      "qte": 0.057,
+      "unite": "bouteille"
+     },
+     "qte": 1
+    },
+    {
+     "achat": {
+      "produit": "Jus de fruits exotiques (punch)",
+      "fournisseur": "Vito",
+      "qte": 8,
+      "unite": "cl"
+     },
+     "qte": 1
+    }
+   ],
+   "description": "Rhum ambré 4 cl + jus de fruits 8 cl, préparé en cuisine."
+  },
+  {
+   "id": "coupe_champagne",
+   "nom": "Coupe de champagne",
+   "famille": "Boissons",
+   "motsCles": [
+    "coupe de champagne",
+    "coupes de champagne",
+    "verre de champagne",
+    "verres de champagne",
+    "champagne a l arrivee",
+    "champagne d accueil"
+   ],
+   "contenu": [
+    {
+     "bar": "Champagne",
+     "qte": 1,
+     "boissonsDepuisTexte": "coupes?|verres?",
+     "qteMax": 4
+    }
+   ],
+   "description": "1 coupe par personne (6 coupes par bouteille)."
   },
   {
    "id": "boisson_chaude",
@@ -864,6 +1191,9 @@
      "boisson": "chaude",
      "qte": 1
     }
+   ],
+   "exclusions": [
+    "re:gobelets?(?: [a-z]+){0,4} boissons? chaudes?"
    ]
   },
   {
@@ -886,13 +1216,14 @@
    "famille": "Boissons",
    "motsCles": [
     "forfait sans alcool",
-    "forfaits sans alcool"
+    "forfaits sans alcool",
+    "forfait boissons sans alcool",
+    "forfait boisson sans alcool",
+    "forfaits boissons sans alcool",
+    "forfaits boisson sans alcool",
+    "cocktail sans alcool + 2 boissons sans alcool"
    ],
    "contenu": [
-    {
-     "bar": "Cocktail sans alcool",
-     "qte": 1
-    },
     {
      "boisson": "soft",
      "qte": 2
@@ -900,8 +1231,14 @@
    ],
    "absorbe": [
     "soft",
+    "boisson_chaude",
+    "jus_pomme",
+    "soft_ou_chaude"
+   ],
+   "inclut": [
     "mocktail"
-   ]
+   ],
+   "description": "1 cocktail sans alcool (recette mocktail) + 2 boissons sans alcool."
   },
   {
    "id": "soft",
@@ -922,38 +1259,99 @@
      "boisson": "soft",
      "qte": 1
     }
+   ],
+   "exclusions": [
+    "verres soft",
+    "verre soft"
+   ]
+  },
+  {
+   "id": "soft_ou_chaude",
+   "nom": "Boisson sans alcool ou chaude",
+   "famille": "Boissons",
+   "motsCles": [
+    "re:boissons? (?:sans alcool|soft|fraiche)(?: [a-z0-9]+){0,4} ou (?:une )?boissons? chaudes?",
+    "re:boissons? chaudes?(?: [a-z0-9]+){0,4} ou (?:une )?(?:boissons? )?(?:sans alcool|soft|fraiche)",
+    "boisson sans alcool ou chaude",
+    "boissons sans alcool ou chaudes",
+    "soft ou boisson chaude"
+   ],
+   "contenu": [
+    {
+     "boisson": "sans_alcool_ou_chaude",
+     "qte": 1
+    }
+   ],
+   "description": "« 1 boisson sans alcool ou boisson chaude » : une seule boisson, pas deux.",
+   "absorbe": [
+    {
+     "id": "boisson_chaude",
+     "si": [
+      "parmi",
+      "au choix",
+      "choix parmi",
+      "choix"
+     ]
+    },
+    {
+     "id": "jus_pomme",
+     "si": [
+      "parmi",
+      "au choix",
+      "choix parmi",
+      "choix"
+     ]
+    },
+    {
+     "id": "soft",
+     "si": [
+      "parmi",
+      "au choix",
+      "choix parmi",
+      "choix"
+     ]
+    }
    ]
   },
   {
    "id": "cocktail_spritz",
-   "nom": "Cocktail Spritz / Hugo / Mojito",
+   "nom": "Cocktail Spritz / Hugo",
    "famille": "Boissons",
    "motsCles": [
     "spritz",
     "hugo",
-    "mojito",
     "cocktail signature",
-    "cocktails signature"
+    "cocktails signature",
+    "cocktail spritz",
+    "cocktails spritz",
+    "cocktail hugo",
+    "cocktails hugo",
+    "bar a cocktails",
+    "bar a cocktail",
+    "bar a spritz"
    ],
    "exclusions": [
-    "virgin"
+    "virgin spritz",
+    "virgin hugo",
+    "spritz sans alcool",
+    "hugo sans alcool"
    ],
    "contenu": [
     {
      "achat": {
-      "produit": "Bulles de l'Ouest (Spritz)",
+      "produit": "Bulles de l'Ouest (Spritz, bouteille 75 cl)",
       "fournisseur": "Braud",
-      "qte": 6,
-      "unite": "cl"
+      "qte": 0.08,
+      "unite": "bouteille"
      },
      "qte": 1
     },
     {
      "achat": {
-      "produit": "Liqueur Giffard (Spritz / sureau)",
+      "produit": "Liqueur Giffard (Spritz / sureau, bouteille 70 cl)",
       "fournisseur": "Vito",
-      "qte": 5,
-      "unite": "cl"
+      "qte": 0.072,
+      "unite": "bouteille"
      },
      "qte": 1
     },
@@ -976,15 +1374,22 @@
     "mocktail",
     "mocktails",
     "virgin",
-    "cocktail sans alcool"
+    "cocktail sans alcool",
+    "virgin spritz",
+    "virgin hugo",
+    "virgin mojito",
+    "spritz sans alcool",
+    "hugo sans alcool",
+    "mojito sans alcool",
+    "cocktails sans alcool"
    ],
    "contenu": [
     {
      "achat": {
-      "produit": "Liqueur sans alcool Giffard",
+      "produit": "Liqueur sans alcool Giffard (bouteille 70 cl)",
       "fournisseur": "Vito",
-      "qte": 5,
-      "unite": "cl"
+      "qte": 0.072,
+      "unite": "bouteille"
      },
      "qte": 1
     },
@@ -1026,8 +1431,7 @@
    ],
    "exclusions": [
     "verre de vin",
-    "verres de vin",
-    "forfait"
+    "verres de vin"
    ],
    "contenu": [
     {
@@ -1041,7 +1445,27 @@
      "qte": 1
     }
    ],
-   "description": "Bouteilles commandées par le client (nom du vin repris de la fiche), comptées à l'unité."
+   "description": "Bouteilles commandées par le client (nom du vin repris de la fiche) : « 29 bouteilles » → 29 ; « 1/2 bouteille par personne » → la moitié des convives ; ligne de devis → sa quantité.",
+   "exclusionsGlobales": [
+    "forfait",
+    "forfaits",
+    "coupe",
+    "coupes",
+    "kir",
+    "kirs",
+    "eau minerale",
+    "eau plate",
+    "eau gazeuse",
+    "eaux minerales",
+    "verre de champagne",
+    "verres de champagne",
+    "droit de bouchon",
+    "droits de bouchon",
+    "droits de bouchons",
+    "droit de bouchons",
+    "apportees par",
+    "apportes par"
+   ]
   },
   {
    "id": "hors_cuisine",
@@ -1082,7 +1506,10 @@
     "service du cocktail",
     "au tarif de l etablissement",
     "choix sur place",
-    "a la carte"
+    "a la carte",
+    "droits de bouchon",
+    "droits de bouchons",
+    "droit de bouchons"
    ]
   }
  ],
@@ -1361,6 +1788,39 @@
      "part": 0.3
     }
    ]
+  },
+  "forfait_mixte": {
+   "label": "Verres au choix (crémant, vins, bière, sans alcool)",
+   "repartition": [
+    {
+     "bar": "Crémant",
+     "part": 0.27
+    },
+    {
+     "bar": "Muscadet",
+     "part": 0.18
+    },
+    {
+     "bar": "Rouge local léger",
+     "part": 0.18
+    },
+    {
+     "bar": "Bière artisanale",
+     "part": 0.17
+    },
+    {
+     "bar": "Breizh Cola",
+     "part": 0.08
+    },
+    {
+     "bar": "Jus de pomme bio des Coteaux Nantais",
+     "part": 0.06
+    },
+    {
+     "bar": "Eau gazeuse Plancoët",
+     "part": 0.06
+    }
+   ]
   }
  },
  "barDefauts": {
@@ -1368,72 +1828,85 @@
    "verresParBouteille": 6,
    "verreCl": 12,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Muscadet": {
    "verresParBouteille": 6,
    "verreCl": 12.5,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Blanc sudiste gourmand": {
    "verresParBouteille": 6,
    "verreCl": 12.5,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Rouge local léger": {
    "verresParBouteille": 6,
    "verreCl": 12.5,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Rouge sudiste gourmand": {
    "verresParBouteille": 6,
    "verreCl": 12.5,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Rosé de saison": {
    "verresParBouteille": 6,
    "verreCl": 12.5,
    "contenant": "bouteille",
-   "fournisseur": "Cave (à préciser)"
+   "fournisseur": "Cave (à préciser)",
+   "contenanceCl": 75
   },
   "Bière artisanale": {
    "verresParBouteille": 1,
    "verreCl": 33,
    "contenant": "bouteille",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 33
   },
   "Breizh Cola": {
    "verresParBouteille": 1,
    "contenant": "bouteille",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 33
   },
   "Limonade": {
    "verresParBouteille": 3,
    "verreCl": 25,
    "contenant": "bouteille",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 75
   },
   "Eau gazeuse Plancoët": {
    "verresParBouteille": 4,
    "verreCl": 25,
    "contenant": "bouteille",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 100
   },
   "Eau plate Plancoët": {
    "verresParBouteille": 4,
    "verreCl": 25,
    "contenant": "bouteille",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 100
   },
   "Jus de pomme bio des Coteaux Nantais": {
    "verresParBouteille": 25,
    "verreCl": 20,
    "contenant": "BIB 5 L",
-   "fournisseur": "La fourche"
+   "fournisseur": "La fourche",
+   "contenanceCl": 500,
+   "fond": true
   },
   "Cocktail sans alcool": {
    "verresParBouteille": 1,
@@ -1444,25 +1917,37 @@
    "verresParBouteille": 35,
    "verreCl": 2,
    "contenant": "bouteille 70 cl",
-   "fournisseur": "Vito"
+   "fournisseur": "Vito",
+   "contenanceCl": 70,
+   "fond": true
   },
   "Café Cime": {
    "parVerre": 8,
    "uniteParVerre": "g",
    "produit": "Café en grains Cime",
-   "fournisseur": "Cime"
+   "fournisseur": "Cime",
+   "fond": true
   },
   "Thé": {
    "parVerre": 1,
    "uniteParVerre": "sachet",
    "produit": "Thé (sachets)",
-   "fournisseur": "Maison Berjac"
+   "fournisseur": "Maison Berjac",
+   "fond": true
   },
   "Chocolat chaud": {
    "parVerre": 25,
    "uniteParVerre": "g",
    "produit": "Chocolat en poudre",
-   "fournisseur": "Maison Berjac"
+   "fournisseur": "Maison Berjac",
+   "fond": true
+  },
+  "Champagne": {
+   "verresParBouteille": 6,
+   "verreCl": 12,
+   "contenanceCl": 75,
+   "contenant": "bouteille",
+   "fournisseur": "Cave (à préciser)"
   }
  },
  "livraisonJourJ": [
